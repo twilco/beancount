@@ -1,0 +1,8 @@
+YEAR = { ASCII_DIGIT{4} }
+MONTH = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
+DAY = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
+DATE = { YEAR ~ HYPHEN ~ MONTH ~ HYPHEN ~ DAY }
+
+VALID_ACCOUNT_TYPE = { "Assets" | "Liabilities" | "Income" | "Expenses" | "Equity" }
+ACCOUNT_NAME_PIECE = { ":" ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT) ~ (ASCII_ALPHA_LOWER | ASCII_ALPHA_UPPER | ASCII_DIGIT | "-")* }
+ACCOUNT = { VALID_ACCOUNT_TYPE ~ ACCOUNT_NAME_PIECE? }

@@ -1,4 +1,4 @@
-## Beancount
+# Beancount
 
 Rust tooling surrounding [beancount](https://github.com/beancount/beancount), a double-entry bookkeeping language.
 
