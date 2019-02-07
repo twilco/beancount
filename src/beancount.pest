@@ -1,8 +1,27 @@
-YEAR = { ASCII_DIGIT{4} }
-MONTH = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
-DAY = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
-DATE = { YEAR ~ HYPHEN ~ MONTH ~ HYPHEN ~ DAY }
+// Dates
+year = { ASCII_DIGIT{4} }
+month = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
+day = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
+date = { year ~ HYPHEN ~ month ~ HYPHEN ~ day }
 
-VALID_ACCOUNT_TYPE = { "Assets" | "Liabilities" | "Income" | "Expenses" | "Equity" }
-ACCOUNT_NAME_PIECE = { ":" ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT) ~ (ASCII_ALPHA_LOWER | ASCII_ALPHA_UPPER | ASCII_DIGIT | "-")* }
-ACCOUNT = { VALID_ACCOUNT_TYPE ~ ACCOUNT_NAME_PIECE? }
+// Numbers
+num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
+    int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+operation = _{ add | subtract | multiply | divide }
+    add      = { "+" }
+    subtract = { "-" }
+    multiply = { "*" }
+    divide   = { "/" }
+num_expr = { term ~ (operation ~ term)* }
+term = _{ num | "(" ~ num_expr ~ ")" }
+
+// Accounts
+account_type = { "Assets" | "Liabilities" | "Income" | "Expenses" | "Equity" }
+account_name_piece = { ":" ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT) ~ (ASCII_ALPHA_LOWER | ASCII_ALPHA_UPPER | ASCII_DIGIT | "-")* }
+account = { account_type ~ account_name_piece* }
+
+// Directives
+dated_directive_type = { "*" | "!" | "balance" | "close" | "commodity" | "custom" | "document" | "event" | "note" | "open" | "pad" | "price" | "query" | "txn" }
+undated_directive_type = { "include" | "plugin" | "option" }
+
+balance = { date ~ " balance " ~ account }
