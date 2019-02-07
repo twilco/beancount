@@ -295,7 +295,7 @@ pub struct Event<'a> {
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.86lelow4097r>
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Include<'a> {
-    /// Fully qualified filename, including any necessary path segements.
+    /// Fully qualified filename, including any necessary path segments.
     filename: &'a str,
 }
 

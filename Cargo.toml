@@ -5,7 +5,6 @@ authors = ["Tyler Wilcock <tyler.l.wilcock@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-derive_builder = "0.7.0"
 typed-builder = "0.1.1"
 pest = "2.1.0"
 pest_derive = "2.1.0"
