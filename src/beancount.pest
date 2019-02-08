@@ -1,10 +1,10 @@
-// Dates
+// Date primitives
 year = { ASCII_DIGIT{4} }
 month = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
 day = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
 date = { year ~ HYPHEN ~ month ~ HYPHEN ~ day }
 
-// Numbers
+// Number primitives
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
     int = { ("+" | "-")? ~ ASCII_DIGIT+ }
 operation = _{ add | subtract | multiply | divide }
@@ -14,14 +14,25 @@ operation = _{ add | subtract | multiply | divide }
     divide   = { "/" }
 num_expr = { term ~ (operation ~ term)* }
 term = _{ num | "(" ~ num_expr ~ ")" }
+amount = { num_expr ~ WHITE_SPACE ~ currency }
 
-// Accounts
+// String primitives
+double_quote = { "\"" }
+quoted_str = { double_quote ~ inner_quoted_str ~ double_quote }
+inner_quoted_str = @{ quoted_char+ }
+quoted_char = { !"\"" ~ ANY }
+// QUOTATION_MARK includes both single and double quotes.
+valid_non_letter_currency_char = { QUOTATION_MARK |  "_" | HYPHEN | "." }
+currency = @{ ASCII_ALPHA_UPPER ~ (ASCII_ALPHA_UPPER | valid_non_letter_currency_char){0, 22} ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT)? }
+
+// Account primitives
 account_type = { "Assets" | "Liabilities" | "Income" | "Expenses" | "Equity" }
 account_name_piece = { ":" ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT) ~ (ASCII_ALPHA_LOWER | ASCII_ALPHA_UPPER | ASCII_DIGIT | "-")* }
-account = { account_type ~ account_name_piece* }
+account = @{ account_type ~ account_name_piece* }
 
 // Directives
 dated_directive_type = { "*" | "!" | "balance" | "close" | "commodity" | "custom" | "document" | "event" | "note" | "open" | "pad" | "price" | "query" | "txn" }
 undated_directive_type = { "include" | "plugin" | "option" }
 
 balance = { date ~ " balance " ~ account }
+option = { "option " ~ quoted_str ~ " " ~ quoted_str }
