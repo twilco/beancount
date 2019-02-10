@@ -73,6 +73,9 @@ pub struct Balance<'a> {
 
     /// Type of commodity to balance.
     comm: &'a str,
+
+    /// Metadata attached to the balance directive.
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Represents a Beancount `option`, which are configuration points global to the file.
@@ -123,7 +126,7 @@ pub struct Close<'a> {
     /// Account being closed.
     account: Account<'a>,
 
-    /// Metadata attatched to the close.
+    /// Metadata attached to the close directive.
     meta: HashMap<&'a str, &'a str>,
 }
 
@@ -160,7 +163,7 @@ pub struct Commodity<'a> {
     /// Commodity name.
     name: &'a str,
 
-    /// Metadata attached to the commodity.
+    /// Metadata attached to the commodity directive.
     meta: HashMap<&'a str, &'a str>,
 }
 
@@ -219,6 +222,9 @@ pub struct Custom<'a> {
 
     /// Arbitrary number of custom directive arguments.
     args: Vec<&'a str>,
+
+    /// Metadata attached to the custom directive.
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Represents a `document` directive.  A `document` directive can be used to attach an external
@@ -247,6 +253,9 @@ pub struct Document<'a> {
 
     /// Filesystem path to the document.
     path: &'a str,
+
+    /// Metadata attached to the document directive.
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Represents an `event` directive.  `event` directives are used to track the value of some
@@ -275,6 +284,9 @@ pub struct Event<'a> {
 
     /// New value of the event.
     val: &'a str,
+
+    /// Metadata attached to the event directive.
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Represents an `include` directive.  The `include` directive, as it sounds, includes another
@@ -350,6 +362,9 @@ pub struct Note<'a> {
 
     /// Note description.
     desc: &'a str,
+
+    /// Metadata attached to the note directive.
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Represents a `open` directive.  This directive signifies the opening of an account.
@@ -377,7 +392,7 @@ pub struct Open<'a> {
     /// Commodities allowed for the opened account.
     constraint_commodities: Option<&'a str>,
 
-    /// Metadata attached to the open.
+    /// Metadata attached to the open directive.
     meta: HashMap<&'a str, &'a str>,
 }
 
@@ -411,6 +426,9 @@ pub struct Pad<'a> {
 
     /// Account to pad from.
     pad_from_account: Account<'a>,
+
+    /// Metadata attached to the pad directive.
+    meta: HashMap<&'a str, &'a str>
 }
 
 /// Represents a transaction posting.  Postings represent a single amount being deposited to or
@@ -491,7 +509,7 @@ pub struct Plugin<'a> {
     module: &'a str,
 
     /// Configuration data to be passed to the plugin.
-    config: &'a str,
+    config: Option<&'a str>,
 }
 
 /// Represents a `price` directive, which establishes the rate of exchange between one commodity and
@@ -534,6 +552,9 @@ pub struct Price<'a> {
 
     /// Value the base commodity is being quoted at.
     quote_val: f64,
+
+    /// Metadata attached to the price directive.
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Represents a `query` directive.  `query` directives allow you to insert a query in the usual
@@ -566,6 +587,9 @@ pub struct Query<'a> {
 
     /// Query contents.
     query: &'a str,
+
+    /// Metadata attached to the query directive.
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Tag associated with a transaction directive.  Tags allow you to mark a subset of transactions,

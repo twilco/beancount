@@ -1,10 +1,19 @@
-// Date primitives
+//// General primitives
+bool = { ^"true" | ^"false" }
+indent = { WHITE_SPACE+ }
+key = { !":" ~ ASCII_ALPHA_LOWER ~ (ASCII_ALPHA | ASCII_DIGIT | DASH | "_")* }
+key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr | str }
+key_value = { key ~ ":" ~ WHITE_SPACE? ~ key_value_value }
+key_value_line = { indent ~ key_value ~ NEWLINE }
+key_value_list = { key_value_line ~ (key_value_line)* }
+
+//// Date primitives
 year = { ASCII_DIGIT{4} }
 month = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
 day = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
 date = { year ~ HYPHEN ~ month ~ HYPHEN ~ day }
 
-// Number primitives
+//// Number primitives
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
     int = { ("+" | "-")? ~ ASCII_DIGIT+ }
 operation = _{ add | subtract | multiply | divide }
@@ -14,25 +23,77 @@ operation = _{ add | subtract | multiply | divide }
     divide   = { "/" }
 num_expr = { term ~ (operation ~ term)* }
 term = _{ num | "(" ~ num_expr ~ ")" }
-amount = { num_expr ~ WHITE_SPACE ~ currency }
+amount = { num_expr ~ WHITE_SPACE ~ commodity }
 
-// String primitives
+//// String primitives
 double_quote = { "\"" }
 quoted_str = { double_quote ~ inner_quoted_str ~ double_quote }
 inner_quoted_str = @{ quoted_char+ }
 quoted_char = { !"\"" ~ ANY }
+str = { ASCII_ALPHA+ }
 // QUOTATION_MARK includes both single and double quotes.
-valid_non_letter_currency_char = { QUOTATION_MARK |  "_" | HYPHEN | "." }
-currency = @{ ASCII_ALPHA_UPPER ~ (ASCII_ALPHA_UPPER | valid_non_letter_currency_char){0, 22} ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT)? }
+valid_non_letter_commodity_char = { QUOTATION_MARK |  "_" | HYPHEN | "." }
+commodity = @{ ASCII_ALPHA_UPPER ~ (ASCII_ALPHA_UPPER | valid_non_letter_commodity_char){0, 22} ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT)? }
 
-// Account primitives
+//// Account primitives
 account_type = { "Assets" | "Liabilities" | "Income" | "Expenses" | "Equity" }
 account_name_piece = { ":" ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT) ~ (ASCII_ALPHA_LOWER | ASCII_ALPHA_UPPER | ASCII_DIGIT | "-")* }
 account = @{ account_type ~ account_name_piece* }
+tag = { "#" ~ (!(WHITE_SPACE | NEWLINE) ~ ANY)* }
 
-// Directives
-dated_directive_type = { "*" | "!" | "balance" | "close" | "commodity" | "custom" | "document" | "event" | "note" | "open" | "pad" | "price" | "query" | "txn" }
-undated_directive_type = { "include" | "plugin" | "option" }
+//// Directives
 
-balance = { date ~ " balance " ~ account }
-option = { "option " ~ quoted_str ~ " " ~ quoted_str }
+// 2014-08-09 balance Assets:Cash 562.00 USD
+balance = { date ~ WHITE_SPACE ~ "balance" ~ WHITE_SPACE ~ account ~ NEWLINE ~ key_value_list? }
+
+// ; Closing credit card after fraud was detected.
+// 2016-11-28 close Liabilities:CreditCard:CapitalOne
+close = { date ~ WHITE_SPACE ~ "close" ~ WHITE_SPACE ~ account ~ NEWLINE ~ key_value_list? }
+
+// 2012-01-01 commodity HOOL
+commodity_directive = { date ~ WHITE_SPACE ~ "commodity" ~ WHITE_SPACE ~ commodity ~ NEWLINE ~ key_value_list? }
+
+// 2014-07-09 custom "budget" "some_config_opt_for_custom_directive" TRUE 45.30 USD
+custom_value = { quoted_str | date | bool | amount | num_expr | account }
+custom_value_list = { custom_value ~ (WHITE_SPACE ~ custom_value)* }
+custom = { date ~ WHITE_SPACE ~ "custom" ~ WHITE_SPACE ~ quoted_str ~ WHITE_SPACE ~ custom_value_list? ~ NEWLINE ~ key_value_list? }
+
+// 2013-11-03 document Liabilities:CreditCard "/home/joe/stmts/apr-2014.pdf"
+document = { date ~ WHITE_SPACE ~ "document" ~ WHITE_SPACE ~ account ~ quoted_str ~ NEWLINE ~ key_value_list? }
+
+// 2014-07-09 event "location" "Paris, France"
+event = { date ~ WHITE_SPACE ~ "event" ~ WHITE_SPACE ~ quoted_str ~ WHITE_SPACE ~ quoted_str ~ NEWLINE ~ key_value_list? }
+
+// include "path/to/include/file.beancount"
+include = { "include" ~ WHITE_SPACE ~ quoted_str ~ NEWLINE }
+
+// 2013-11-03 note Liabilities:CreditCard "Called about fraudulent card."
+note = { date ~ WHITE_SPACE ~ "note" ~ WHITE_SPACE ~ account ~ WHITE_SPACE ~ quoted_str ~ NEWLINE ~ key_value_list? }
+
+// 2014-05-01 open Liabilities:CreditCard:CapitalOne USD
+open = { date ~ WHITE_SPACE ~ "open" ~ WHITE_SPACE ~ account ~ WHITE_SPACE ~ commodity ~ NEWLINE ~ key_value_list? }
+
+// option "title" "Ed’s Personal Ledger"
+option = { "option " ~ quoted_str ~ " " ~ quoted_str ~ NEWLINE }
+
+// 2014-06-01 pad Assets:BofA:Checking Equity:Opening-Balances
+pad = { date ~ WHITE_SPACE ~ "pad" ~ WHITE_SPACE ~ account ~ account ~ NEWLINE ~ key_value_list? }
+
+// plugin "beancount.plugins.module_name" "configuration data"
+plugin = { "plugin" ~ (WHITE_SPACE ~ quoted_str){1,2} ~ NEWLINE }
+
+// 2014-07-09 price HOOL 579.18 USD
+price = { date ~ WHITE_SPACE ~ "price" ~ WHITE_SPACE ~ commodity ~ WHITE_SPACE ~ amount ~ NEWLINE ~ key_value_list? }
+
+// 2014-07-09 query "france-balances" "
+//   SELECT account, sum(position) WHERE ‘trip-france-2014’ in tags"
+query = { date ~ WHITE_SPACE ~ "query" ~ WHITE_SPACE ~ quoted_str ~ WHITE_SPACE ~ quoted_str ~ NEWLINE ~ key_value_list? }
+
+// 2014-05-05 txn "Cafe Mogador" "Lamb tagine with wine"
+//     Liabilities:CreditCard:CapitalOne         -37.45 USD
+//     Expenses:Restaurant
+txn_indicator  = { "txn" | "*" | "!" }
+// TODO: Consider adding support for deprecated pipe syntax.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-341
+// https://github.com/twilco/beancount/issues/2
+txn_strings = { quoted_str ~ (WHITE_SPACE ~ txn_strings)? }
+transaction = { date ~ WHITE_SPACE ~ txn_indicator ~ WHITE_SPACE ~ txn_strings }
