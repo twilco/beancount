@@ -46,7 +46,7 @@ tag = { "#" ~ (!(WHITE_SPACE | eol) ~ ANY)* }
 //// Directives
 
 // 2014-08-09 balance Assets:Cash 562.00 USD
-balance = { date ~ WHITE_SPACE ~ "balance" ~ WHITE_SPACE ~ account ~ eol ~ key_value_list? }
+balance = { date ~ WHITE_SPACE ~ "balance" ~ WHITE_SPACE ~ account ~ WHITE_SPACE ~ amount ~ eol ~ key_value_list? }
 
 // ; Closing credit card after fraud was detected.
 // 2016-11-28 close Liabilities:CreditCard:CapitalOne
