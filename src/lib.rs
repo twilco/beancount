@@ -1,8 +1,5 @@
 use std::collections::HashMap;
 
-#[macro_use]
-extern crate typed_builder;
-
 pub mod constructs;
 
 ///
