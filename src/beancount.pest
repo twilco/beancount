@@ -40,7 +40,7 @@ commodity = @{ ASCII_ALPHA_UPPER ~ (ASCII_ALPHA_UPPER | valid_non_letter_commodi
 //// Account primitives
 account_type = { UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account_name_piece = { ":" ~ (UPPERCASE_LETTER | DECIMAL_NUMBER) ~ (LETTER | DECIMAL_NUMBER | "-")* }
-account = @{ account_type ~ account_name_piece* }
+account = @{ account_type ~ account_name_piece+ }
 tag = { "#" ~ (!(WHITE_SPACE | eol) ~ ANY)* }
 
 //// Directives
