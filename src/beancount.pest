@@ -17,7 +17,8 @@ date = { year ~ HYPHEN ~ month ~ HYPHEN ~ day }
 
 //// Number primitives
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
-    int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+    int = { ("+" | "-")? ~ ( ASCII_DIGIT{4,} | separated_int ) }
+    separated_int = { ASCII_DIGIT{1,3} ~ ( "," ~ ASCII_DIGIT{3} )* }
 operation = _{ add | subtract | multiply | divide }
     add      = { "+" }
     subtract = { "-" }
