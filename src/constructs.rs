@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use typed_builder::TypedBuilder;
+
 /// Represents an account.
 ///
 /// Beancount accumulates commodities in accounts.  An account name is a

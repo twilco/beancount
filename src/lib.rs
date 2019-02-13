@@ -1,12 +1,5 @@
-use std::collections::HashMap;
-
-#[macro_use]
-extern crate derive_builder;
-
-#[macro_use]
-extern crate typed_builder;
-
 pub mod constructs;
+pub mod parsers;
 
 ///
 /// 2014-02-03 open Assets:US:BofA:Checking
