@@ -33,9 +33,9 @@ quoted_str = { double_quote ~ inner_quoted_str ~ double_quote }
 inner_quoted_str = @{ quoted_char+ }
 quoted_char = { !"\"" ~ ANY }
 str = { ASCII_ALPHA+ }
-// QUOTATION_MARK includes both single and double quotes.
-valid_non_letter_commodity_char = { QUOTATION_MARK |  "_" | HYPHEN | "." }
-commodity = @{ ASCII_ALPHA_UPPER ~ (ASCII_ALPHA_UPPER | valid_non_letter_commodity_char){0, 22} ~ (ASCII_ALPHA_UPPER | ASCII_DIGIT)? }
+valid_non_letter_commodity_char = { "'" |  "_" | "-" | "." }
+commodity_trailing = { valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
+commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
 
 //// Account primitives
 account_type = { UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
