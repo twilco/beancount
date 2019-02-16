@@ -16,7 +16,8 @@ ws = _{ "	" | " " }
 year = { ASCII_DIGIT{4} }
 month = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
 day = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
-date = { year ~ HYPHEN ~ month ~ HYPHEN ~ day }
+date_separator = { "-" | "/" }
+date = { year ~ date_separator ~ month ~ date_separator ~ day }
 
 //// Number primitives
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? }

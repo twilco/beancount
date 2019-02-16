@@ -27,6 +27,19 @@ mod tests {
     }
 
     #[test]
+    fn date() {
+        parse_ok!(date, "2019-01-12");
+        parse_ok!(date, "1979/01/01");
+        parse_ok!(date, "2019-12-31");
+
+        parse_fail!(date, "123-01-01");
+        parse_fail!(date, "2020-13-01");
+        parse_fail!(date, "2020-12-32");
+        parse_fail!(date, "2020 02 02");
+        parse_fail!(date, "02-02-2020");
+    }
+
+    #[test]
     fn num() {
         parse_ok!(num, "1");
         parse_ok!(num, "1.");
