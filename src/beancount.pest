@@ -47,8 +47,9 @@ commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
 account_type = { UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account_name_piece = { ":" ~ (UPPERCASE_LETTER | DECIMAL_NUMBER) ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account = @{ account_type ~ account_name_piece+ }
-link = { "^" ~ (!(ws | eol) ~ ANY)* }
-tag = { "#" ~ (!(ws | eol) ~ ANY)* }
+tag_name = { ( ASCII_ALPHANUMERIC | "-" | "_" | "/" | "." )+ }
+link = { "^" ~ tag_name }
+tag = { "#" ~ tag_name }
 tags_links = { (link | tag) ~ (ws+ ~ (link | tag))* }
 
 //// Directives

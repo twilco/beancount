@@ -98,4 +98,17 @@ mod tests {
         parse_fail!(account, "Assets: Foo");
         parse_fail!(account, "Expenses:tax");
     }
+
+    #[test]
+    fn tag() {
+        parse_ok!(tag, "#foo");
+        parse_ok!(tag, "#FOO");
+        parse_ok!(tag, "#123");
+        parse_ok!(tag, "#foo-123/asd.asfd_asd");
+        parse_ok!(tag, "#foo bar", "#foo");
+        parse_ok!(link, "^foo");
+
+        parse_ok!(tag, "#fooæ", "#foo");
+        parse_fail!(tag, "#");
+    }
 }
