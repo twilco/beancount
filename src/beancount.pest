@@ -34,8 +34,9 @@ amount = { num_expr ~ ws+ ~ commodity }
 //// String primitives
 double_quote = { "\"" }
 quoted_str = { double_quote ~ inner_quoted_str ~ double_quote }
-inner_quoted_str = @{ quoted_char+ }
-quoted_char = { !"\"" ~ ANY }
+inner_quoted_str = @{ quoted_char* }
+quoted_char = { escape_sequence | ( !"\"" ~ ANY ) }
+escape_sequence = { "\\" ~ ANY }
 str = { ASCII_ALPHA+ }
 valid_non_letter_commodity_char = { "'" |  "_" | "-" | "." }
 commodity_trailing = { valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
