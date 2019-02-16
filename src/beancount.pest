@@ -4,11 +4,11 @@ indent = { ws+ }
 comment = { ws* ~ ";" ~ (!NEWLINE ~ ANY)* }
 eol = { ws* ~ NEWLINE | comment ~ NEWLINE }
 indented_comment_line = { indent ~ comment ~ NEWLINE }
-key = { ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | DASH | "_")* }
-key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr | str }
+key = { ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
+key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
 key_value = { key ~ ws* ~ ":" ~ ws* ~ key_value_value }
 key_value_line = { indent ~ key_value ~ eol }
-key_value_list = { key_value_line ~ (key_value_line)* }
+key_value_list = { key_value_line+ }
 // tab or space
 ws = _{ "	" | " " }
 
@@ -38,7 +38,6 @@ quoted_str = { double_quote ~ inner_quoted_str ~ double_quote }
 inner_quoted_str = @{ quoted_char* }
 quoted_char = { escape_sequence | ( !"\"" ~ ANY ) }
 escape_sequence = { "\\" ~ ANY }
-str = { ASCII_ALPHA+ }
 valid_non_letter_commodity_char = { "'" |  "_" | "-" | "." }
 commodity_trailing = { valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
 commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }

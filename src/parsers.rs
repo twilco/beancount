@@ -27,6 +27,31 @@ mod tests {
     }
 
     #[test]
+    fn key_value() {
+        parse_ok!(key_value, "key: \"value\"");
+        parse_ok!(key_value, "key:\"value\"");
+        parse_ok!(key_value, "key:    \"value\"");
+        parse_ok!(key_value, "key: Assets:Cash");
+        parse_ok!(key_value, "key: 2019-01-01");
+        parse_ok!(key_value, "key: USD");
+        parse_ok!(key_value, "key: #foo");
+        parse_ok!(key_value, "key: True");
+        parse_ok!(key_value, "key: 200.00 USD");
+        parse_ok!(key_value, "key: 200.00");
+        parse_ok!(key_value, "key1: 1");
+
+        parse_fail!(key_value, "key: bar");
+        parse_fail!(key_value, "k: 123");
+        parse_fail!(key_value, "Key: 123");
+    }
+
+    #[test]
+    fn key_value_list() {
+        parse_ok!(key_value_list, " key: 123\n");
+        parse_ok!(key_value_list, " key: 123\n key2: 456\n");
+    }
+
+    #[test]
     fn date() {
         parse_ok!(date, "2019-01-12");
         parse_ok!(date, "1979/01/01");
