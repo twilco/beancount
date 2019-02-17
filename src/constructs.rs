@@ -90,7 +90,7 @@ pub struct Balance<'a> {
 ///
 /// Example `option` directive:
 ///
-/// ```
+/// ```text
 /// option "title" "Ed’s Personal Ledger"
 /// ````
 ///
