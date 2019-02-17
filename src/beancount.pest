@@ -6,7 +6,7 @@ eol = { ws* ~ NEWLINE | comment ~ NEWLINE }
 indented_comment_line = { indent ~ comment ~ NEWLINE }
 key = { ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | DASH | "_")* }
 key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr | str }
-key_value = { key ~ ws* ~ ":" ~ ws* ~ key_value_value }
+key_value = { key ~ ":" ~ ws* ~ key_value_value }
 key_value_line = { indent ~ key_value ~ eol }
 key_value_list = { key_value_line ~ (key_value_line)* }
 // tab or space
@@ -63,7 +63,7 @@ commodity_directive = { date ~ ws+ ~ "commodity" ~ ws+ ~ commodity ~ eol ~ key_v
 
 // 2014-07-09 custom "budget" "some_config_opt_for_custom_directive" TRUE 45.30 USD
 custom_value = { quoted_str | date | bool | amount | num_expr | account }
-custom_value_list = { custom_value ~ (ws ~ custom_value)* }
+custom_value_list = { custom_value ~ (ws+ ~ custom_value)* }
 custom = { date ~ ws+ ~ "custom" ~ ws+ ~ quoted_str ~ ws+ ~ custom_value_list? ~ eol ~ key_value_list? }
 
 filename = { quoted_str }
