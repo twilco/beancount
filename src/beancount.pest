@@ -6,7 +6,7 @@ eol = { ws* ~ NEWLINE | comment ~ NEWLINE }
 indented_comment_line = { indent ~ comment ~ NEWLINE }
 key = { ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
 key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
-key_value = { key ~ ws* ~ ":" ~ ws* ~ key_value_value }
+key_value = { key ~ ":" ~ ws* ~ key_value_value }
 key_value_line = { indent ~ key_value ~ eol }
 key_value_list = { key_value_line+ }
 // tab or space
@@ -65,7 +65,7 @@ commodity_directive = { date ~ ws+ ~ "commodity" ~ ws+ ~ commodity ~ eol ~ key_v
 
 // 2014-07-09 custom "budget" "some_config_opt_for_custom_directive" TRUE 45.30 USD
 custom_value = { quoted_str | date | bool | amount | num_expr | account }
-custom_value_list = { custom_value ~ (ws ~ custom_value)* }
+custom_value_list = { custom_value ~ (ws+ ~ custom_value)* }
 custom = { date ~ ws+ ~ "custom" ~ ws+ ~ quoted_str ~ ws+ ~ custom_value_list? ~ eol ~ key_value_list? }
 
 filename = { quoted_str }
@@ -106,7 +106,7 @@ query = { date ~ ws+ ~ "query" ~ ws+ ~ quoted_str ~ ws+ ~ quoted_str ~ eol ~ key
 //     Liabilities:CreditCard:CapitalOne         -37.45 USD
 //     Expenses:Restaurant
 transaction = { date ~ ws+ ~ txn_flag ~ ws+ ~ txn_strings ~ (ws+ ~ tags_links)? ~ eol ~ posting_or_kv_list? }
-txn_flag = { flag_okay | flag_warning | flag_padding | flag_summarize | flag_transfer | flag_conversions | flag_unrealized | flag_returns | flag_merging | flag_hash }
+txn_flag = { flag_okay | flag_warning | flag_padding | flag_summarize | flag_transfer | flag_conversions | flag_unrealized | flag_returns | flag_merging | flag_forecasted }
 // Transactions that have been checked.
 flag_okay = { "*" | "txn" }
 // Mark by the user as something to be looked at later on.
@@ -125,10 +125,9 @@ flag_unrealized = { "U" }
 flag_returns = { "R" }
 // A flag to mark postings merging together legs for average cost.
 flag_merging = { "M" }
-// TODO: Figure out what this flag means and document accordingly.  It is supported in the original grammar, but I'm not sure what it is.
-// https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-274
-// https://github.com/twilco/beancount/issues/10
-flag_hash = { "#" }
+// A flag to indicate forecasted transactions.  See here for more info:
+// https://bitbucket.org/blais/beancount/src/487cb9b0248427ac6882889b6b8bcc1665ce393e/beancount/plugins/forecast.py?at=default&fileviewer=file-view-default
+flag_forecasted = { "#" }
 // TODO: Consider adding support for deprecated pipe syntax.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-341
 // https://github.com/twilco/beancount/issues/2
 txn_strings = { quoted_str ~ (ws+ ~ quoted_str)? }
@@ -146,7 +145,11 @@ price_annotation = { incomplete_amount }
 // 189.10 USD | USD | 152.41
 incomplete_amount = { (num_expr ~ ws+ ~ commodity) | commodity | num_expr }
 // {{502.12 # 9.95 USD, 2018-01-01}}
-cost_spec = { ("{{" | "{") ~ cost_comp_list ~ ("}}" | "}") }
+cost_spec = {
+	("{" ~ cost_comp_list ~ "}")
+    |
+    ("{{" ~ cost_comp_list ~ "}}")
+}
 // 502.12 # 9.95 USD, 2018-01-01, "hello there"
 cost_comp_list = { cost_comp ~ (ws* ~ "," ~ ws* ~ cost_comp)* }
 // TODO: Need to handle the asterisk case here.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-669
