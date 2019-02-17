@@ -70,7 +70,7 @@ custom = { date ~ ws+ ~ "custom" ~ ws+ ~ quoted_str ~ ws+ ~ custom_value_list? ~
 
 filename = { quoted_str }
 // 2013-11-03 document Liabilities:CreditCard "/home/joe/stmts/apr-2014.pdf"
-document = { date ~ ws+ ~ "document" ~ ws+ ~ account ~ filename ~ tags_links? ~ eol ~ key_value_list? }
+document = { date ~ ws+ ~ "document" ~ ws+ ~ account ~ ws+ ~ filename ~ ws* ~ tags_links? ~ eol ~ key_value_list? }
 
 // 2014-07-09 event "location" "Paris, France"
 event = { date ~ ws+ ~ "event" ~ ws+ ~ quoted_str ~ ws+ ~ quoted_str ~ eol ~ key_value_list? }
@@ -88,7 +88,7 @@ open = { date ~ ws+ ~ "open" ~ ws+ ~ account ~ ws+ ~ commodity ~ eol ~ key_value
 option = { "option " ~ quoted_str ~ " " ~ quoted_str ~ eol }
 
 // 2014-06-01 pad Assets:BofA:Checking Equity:Opening-Balances
-pad = { date ~ ws+ ~ "pad" ~ ws+ ~ account ~ account ~ eol ~ key_value_list? }
+pad = { date ~ ws+ ~ "pad" ~ ws+ ~ account ~ ws+ ~ account ~ eol ~ key_value_list? }
 
 // plugin "beancount.plugins.module_name" "configuration data"
 plugin = { "plugin" ~ (ws+ ~ quoted_str){1,2} ~ eol }

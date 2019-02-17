@@ -9,6 +9,7 @@ pub struct BeancountParser;
 mod tests {
     use super::*;
     use pest::Parser;
+    use indoc::indoc;
 
 
     macro_rules! parse_ok {
@@ -136,4 +137,92 @@ mod tests {
         parse_ok!(tag, "#fooæ", "#foo");
         parse_fail!(tag, "#");
     }
+
+    #[test]
+    fn balance() {
+        parse_ok!(balance, "2014-08-09 balance Assets:Cash 562.00 USD\n");
+        parse_ok!(balance, "2014-08-09 balance Assets:Cash 562.00 USD\n  foo: \"bar\"\n");
+        parse_ok!(balance, "2014-08-09   balance  Assets:Cash    562.00  USD\n");
+    }
+
+    #[test]
+    fn close() {
+        parse_ok!(close, "2016-11-28 close Liabilities:CreditCard:CapitalOne\n");
+    }
+
+    #[test]
+    fn commodity_directive() {
+        parse_ok!(commodity_directive, "2012-01-01 commodity HOOL\n");
+    }
+
+    #[test]
+    fn custom() {
+        parse_ok!(custom, "2014-07-09 custom \"budget\" \"some_config_opt_for_custom_directive\" TRUE 45.30 USD\n");
+    }
+
+    #[test]
+    fn document() {
+        parse_ok!(document, "2013-11-03 document Liabilities:CreditCard \"/home/joe/stmts/apr-2014.pdf\"\n");
+    }
+
+    #[test]
+    fn event() {
+        parse_ok!(event, "2014-07-09 event \"location\" \"Paris, France\"\n");
+    }
+
+    #[test]
+    fn include() {
+        parse_ok!(include, "include \"path/to/include/file.beancount\"\n");
+    }
+
+    #[test]
+    fn note() {
+        parse_ok!(note, "2013-11-03 note Liabilities:CreditCard \"Called about fraudulent card.\"\n");
+    }
+
+    #[test]
+    fn open() {
+        parse_ok!(open, "2014-05-01 open Liabilities:CreditCard:CapitalOne USD\n");
+    }
+
+    #[test]
+    fn option() {
+        parse_ok!(option, "option \"title\" \"Ed’s Personal Ledger\"\n");
+    }
+
+    #[test]
+    fn pad() {
+        parse_ok!(pad, "2014-06-01 pad Assets:BofA:Checking Equity:Opening-Balances\n");
+    }
+
+    #[test]
+    fn plugin() {
+        parse_ok!(plugin, "plugin \"beancount.plugins.module_name\" \"configuration data\"\n");
+    }
+
+    #[test]
+    fn price() {
+        parse_ok!(price, "2014-07-09 price HOOL 579.18 USD\n");
+    }
+
+    #[test]
+    fn query() {
+        parse_ok!(query, "2014-07-09 query \"france-balances\" \"SELECT account, sum(position) WHERE ‘trip-france-2014’ in tags\"\n");
+    }
+
+    #[test]
+    fn posting() {
+        parse_ok!(posting, " Assets:Cash  200 USD\n");
+        parse_ok!(posting, " Assets:Cash\n");
+    }
+
+    #[test]
+    fn transaction() {
+        parse_ok!(transaction, indoc!("
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+                Liabilities:CreditCard:CapitalOne         -37.45 USD
+                Expenses:Restaurant
+            "));
+    }
+
 }
