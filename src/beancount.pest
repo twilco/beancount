@@ -4,11 +4,11 @@ indent = { ws+ }
 comment = { ws* ~ ";" ~ (!NEWLINE ~ ANY)* }
 eol = { ws* ~ NEWLINE | comment ~ NEWLINE }
 indented_comment_line = { indent ~ comment ~ NEWLINE }
-key = { ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | DASH | "_")* }
-key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr | str }
+key = { ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
+key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
 key_value = { key ~ ":" ~ ws* ~ key_value_value }
 key_value_line = { indent ~ key_value ~ eol }
-key_value_list = { key_value_line ~ (key_value_line)* }
+key_value_list = { key_value_line+ }
 // tab or space
 ws = _{ "	" | " " }
 
@@ -16,7 +16,8 @@ ws = _{ "	" | " " }
 year = { ASCII_DIGIT{4} }
 month = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
 day = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
-date = { year ~ HYPHEN ~ month ~ HYPHEN ~ day }
+date_separator = { "-" | "/" }
+date = { year ~ date_separator ~ month ~ date_separator ~ day }
 
 //// Number primitives
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
@@ -34,9 +35,9 @@ amount = { num_expr ~ ws+ ~ commodity }
 //// String primitives
 double_quote = { "\"" }
 quoted_str = { double_quote ~ inner_quoted_str ~ double_quote }
-inner_quoted_str = @{ quoted_char+ }
-quoted_char = { !"\"" ~ ANY }
-str = { ASCII_ALPHA+ }
+inner_quoted_str = @{ quoted_char* }
+quoted_char = { escape_sequence | ( !"\"" ~ ANY ) }
+escape_sequence = { "\\" ~ ANY }
 valid_non_letter_commodity_char = { "'" |  "_" | "-" | "." }
 commodity_trailing = { valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
 commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
@@ -45,8 +46,9 @@ commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
 account_type = { UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account_name_piece = { ":" ~ (UPPERCASE_LETTER | DECIMAL_NUMBER) ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account = @{ account_type ~ account_name_piece+ }
-link = { "^" ~ (!(ws | eol) ~ ANY)* }
-tag = { "#" ~ (!(ws | eol) ~ ANY)* }
+tag_name = { ( ASCII_ALPHANUMERIC | "-" | "_" | "/" | "." )+ }
+link = { "^" ~ tag_name }
+tag = { "#" ~ tag_name }
 tags_links = { (link | tag) ~ (ws+ ~ (link | tag))* }
 
 //// Directives
@@ -68,7 +70,7 @@ custom = { date ~ ws+ ~ "custom" ~ ws+ ~ quoted_str ~ ws+ ~ custom_value_list? ~
 
 filename = { quoted_str }
 // 2013-11-03 document Liabilities:CreditCard "/home/joe/stmts/apr-2014.pdf"
-document = { date ~ ws+ ~ "document" ~ ws+ ~ account ~ filename ~ tags_links? ~ eol ~ key_value_list? }
+document = { date ~ ws+ ~ "document" ~ ws+ ~ account ~ ws+ ~ filename ~ ws* ~ tags_links? ~ eol ~ key_value_list? }
 
 // 2014-07-09 event "location" "Paris, France"
 event = { date ~ ws+ ~ "event" ~ ws+ ~ quoted_str ~ ws+ ~ quoted_str ~ eol ~ key_value_list? }
@@ -86,7 +88,7 @@ open = { date ~ ws+ ~ "open" ~ ws+ ~ account ~ ws+ ~ commodity ~ eol ~ key_value
 option = { "option " ~ quoted_str ~ " " ~ quoted_str ~ eol }
 
 // 2014-06-01 pad Assets:BofA:Checking Equity:Opening-Balances
-pad = { date ~ ws+ ~ "pad" ~ ws+ ~ account ~ account ~ eol ~ key_value_list? }
+pad = { date ~ ws+ ~ "pad" ~ ws+ ~ account ~ ws+ ~ account ~ eol ~ key_value_list? }
 
 // plugin "beancount.plugins.module_name" "configuration data"
 plugin = { "plugin" ~ (ws+ ~ quoted_str){1,2} ~ eol }
