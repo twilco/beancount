@@ -430,7 +430,7 @@ pub struct Pad<'a> {
     pad_from_account: Account<'a>,
 
     /// Metadata attached to the pad directive.
-    meta: HashMap<&'a str, &'a str>
+    meta: HashMap<&'a str, &'a str>,
 }
 
 /// Represents a transaction posting.  Postings represent a single amount being deposited to or

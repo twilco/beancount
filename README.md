@@ -1,4 +1,5 @@
 # Beancount
+[![Build Status](https://travis-ci.org/twilco/beancount.svg?branch=master)](https://travis-ci.org/twilco/beancount)
 
 Rust tooling surrounding [beancount](https://github.com/beancount/beancount), a double-entry bookkeeping language.
 

@@ -1,0 +1,8 @@
+sudo: required
+language: rust
+rust: stable
+cache: cargo
+before_script:
+  - rustup component add rustfmt
+script:
+  - cargo fmt --all -- --check && cargo test

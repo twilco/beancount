@@ -4,20 +4,28 @@ use pest_derive::Parser;
 #[grammar = "beancount.pest"]
 pub struct BeancountParser;
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pest::Parser;
     use indoc::indoc;
-
+    use pest::Parser;
 
     macro_rules! parse_ok {
         ( $rule:ident, $input:expr ) => {
-            assert_eq!(BeancountParser::parse(Rule::$rule, $input).unwrap().as_str(), $input);
+            assert_eq!(
+                BeancountParser::parse(Rule::$rule, $input)
+                    .unwrap()
+                    .as_str(),
+                $input
+            );
         };
         ( $rule:ident, $input:expr, $output:expr ) => {
-            assert_eq!(BeancountParser::parse(Rule::$rule, $input).unwrap().as_str(), $output);
+            assert_eq!(
+                BeancountParser::parse(Rule::$rule, $input)
+                    .unwrap()
+                    .as_str(),
+                $output
+            );
         };
     }
 
@@ -104,8 +112,16 @@ mod tests {
         parse_ok!(commodity, "FOO-123");
         parse_ok!(commodity, "FOOOOOOOOOOOOOOOOOOOOOOO");
 
-        parse_ok!(commodity, "FOOOOOOOOOOOOOOOOOOOOOOOX", "FOOOOOOOOOOOOOOOOOOOOOOO");
-        parse_ok!(commodity, "FOOOOOOOOOOOOOOOOOOOOOO.", "FOOOOOOOOOOOOOOOOOOOOOO");
+        parse_ok!(
+            commodity,
+            "FOOOOOOOOOOOOOOOOOOOOOOOX",
+            "FOOOOOOOOOOOOOOOOOOOOOOO"
+        );
+        parse_ok!(
+            commodity,
+            "FOOOOOOOOOOOOOOOOOOOOOO.",
+            "FOOOOOOOOOOOOOOOOOOOOOO"
+        );
         parse_ok!(commodity, "FOO\"123", "FOO");
         parse_fail!(commodity, "123");
         parse_fail!(commodity, "foo");
@@ -141,13 +157,22 @@ mod tests {
     #[test]
     fn balance() {
         parse_ok!(balance, "2014-08-09 balance Assets:Cash 562.00 USD\n");
-        parse_ok!(balance, "2014-08-09 balance Assets:Cash 562.00 USD\n  foo: \"bar\"\n");
-        parse_ok!(balance, "2014-08-09   balance  Assets:Cash    562.00  USD\n");
+        parse_ok!(
+            balance,
+            "2014-08-09 balance Assets:Cash 562.00 USD\n  foo: \"bar\"\n"
+        );
+        parse_ok!(
+            balance,
+            "2014-08-09   balance  Assets:Cash    562.00  USD\n"
+        );
     }
 
     #[test]
     fn close() {
-        parse_ok!(close, "2016-11-28 close Liabilities:CreditCard:CapitalOne\n");
+        parse_ok!(
+            close,
+            "2016-11-28 close Liabilities:CreditCard:CapitalOne\n"
+        );
     }
 
     #[test]
@@ -162,7 +187,10 @@ mod tests {
 
     #[test]
     fn document() {
-        parse_ok!(document, "2013-11-03 document Liabilities:CreditCard \"/home/joe/stmts/apr-2014.pdf\"\n");
+        parse_ok!(
+            document,
+            "2013-11-03 document Liabilities:CreditCard \"/home/joe/stmts/apr-2014.pdf\"\n"
+        );
     }
 
     #[test]
@@ -177,12 +205,18 @@ mod tests {
 
     #[test]
     fn note() {
-        parse_ok!(note, "2013-11-03 note Liabilities:CreditCard \"Called about fraudulent card.\"\n");
+        parse_ok!(
+            note,
+            "2013-11-03 note Liabilities:CreditCard \"Called about fraudulent card.\"\n"
+        );
     }
 
     #[test]
     fn open() {
-        parse_ok!(open, "2014-05-01 open Liabilities:CreditCard:CapitalOne USD\n");
+        parse_ok!(
+            open,
+            "2014-05-01 open Liabilities:CreditCard:CapitalOne USD\n"
+        );
     }
 
     #[test]
@@ -192,12 +226,18 @@ mod tests {
 
     #[test]
     fn pad() {
-        parse_ok!(pad, "2014-06-01 pad Assets:BofA:Checking Equity:Opening-Balances\n");
+        parse_ok!(
+            pad,
+            "2014-06-01 pad Assets:BofA:Checking Equity:Opening-Balances\n"
+        );
     }
 
     #[test]
     fn plugin() {
-        parse_ok!(plugin, "plugin \"beancount.plugins.module_name\" \"configuration data\"\n");
+        parse_ok!(
+            plugin,
+            "plugin \"beancount.plugins.module_name\" \"configuration data\"\n"
+        );
     }
 
     #[test]
@@ -218,11 +258,16 @@ mod tests {
 
     #[test]
     fn transaction() {
-        parse_ok!(transaction, indoc!("
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
             2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
                 Liabilities:CreditCard:CapitalOne         -37.45 USD
                 Expenses:Restaurant
-            "));
+            "
+            )
+        );
     }
 
 }
