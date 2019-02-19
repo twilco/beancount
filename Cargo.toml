@@ -1,8 +1,15 @@
 [package]
 name = "beancount"
+description = "Rust tooling surrounding Beancount, a a double-entry bookkeeping language."
 version = "0.1.0"
-authors = ["Tyler Wilcock <tyler.l.wilcock@gmail.com>"]
+authors = ["Tyler Wilcock <tyler.l.wilcock@gmail.com>", "Michael Budde <mbudde@gmail.com>"]
+repository = "https://github.com/twilco/beancount"
+readme = "README.md"
+license = "MIT/Apache-2.0"
 edition = "2018"
+
+[badges]
+travis-ci = { repository = "twilco/beancount", branch = "master" }
 
 [dependencies]
 typed-builder = "0.1.1"
