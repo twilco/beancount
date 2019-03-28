@@ -55,9 +55,9 @@ mod tests {
     }
 
     #[test]
-    fn key_value_list() {
-        parse_ok!(key_value_list, " key: 123\n");
-        parse_ok!(key_value_list, " key: 123\n key2: 456\n");
+    fn eol_kv_list() {
+        parse_ok!(eol_kv_list, "\n key: 123\n");
+        parse_ok!(eol_kv_list, "\n key: 123\n key2: 456\n");
     }
 
     #[test]
@@ -252,8 +252,8 @@ mod tests {
 
     #[test]
     fn posting() {
-        parse_ok!(posting, " Assets:Cash  200 USD");
-        parse_ok!(posting, " Assets:Cash");
+        parse_ok!(posting, "Assets:Cash  200 USD");
+        parse_ok!(posting, "Assets:Cash");
     }
 
     #[test]
@@ -269,6 +269,26 @@ mod tests {
             )
         );
         parse_ok!(transaction, "2019-02-19*\"Foo\"\"Bar\"\n");
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
+            2018-12-31 * \"Initalize\"
+                Passiver:Foo:Bar                                   123.45 DKK
+                P Passiver:Foo:Bar                                   123.45 DKK
+            "
+            )
+        );
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
+            2018-12-31 * \"Initalize\"
+                ; key: 123
+                Assets:Foo:Bar                                   123.45 DKK
+            "
+            )
+        );
 
         parse_ok!(
             transaction,

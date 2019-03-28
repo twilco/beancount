@@ -3,15 +3,14 @@ WHITESPACE = _ { " " | "\t" }
 COMMENT = _{ ";" ~ (!NEWLINE ~ ANY)* }
 
 bool = @{ ^"true" | ^"false" }
-indent = @{ WHITESPACE+ }
+indent = _{ WHITESPACE+ }
 eol = _{ NEWLINE }
 indented_comment_line = @{ indent ~ COMMENT ~ eol }
 key = @{ ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
-key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
-key_value = !{ key ~ ":" ~ key_value_value }
+value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
+key_value = !{ key ~ ":" ~ value }
 key_value_line = @{ indent ~ key_value ~ eol }
-key_value_list = @{ key_value_line+ }
-eol_kv_list = @{ eol ~ key_value_list? }
+eol_kv_list = @{ eol ~ key_value_line* }
 
 //// Date primitives
 year = @{ ASCII_DIGIT{4} }
@@ -42,6 +41,7 @@ escape_sequence = @{ "\\" ~ ANY }
 valid_non_letter_commodity_char = @{ "'" |  "_" | "-" | "." }
 commodity_trailing = @{ valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
 commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
+commodity_list = @{ commodity ~ ("," ~ commodity)* }
 
 //// Account primitives
 account_type = @{ UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
@@ -59,13 +59,13 @@ balance = { date ~ "balance" ~ account ~ amount ~ eol_kv_list }
 
 // ; Closing credit card after fraud was detected.
 // 2016-11-28 close Liabilities:CreditCard:CapitalOne
-close = { date ~ "close" ~ account ~ eol ~ key_value_list? }
+close = { date ~ "close" ~ account ~ eol_kv_list }
 
 // 2012-01-01 commodity HOOL
 commodity_directive = { date ~ "commodity" ~ commodity ~ eol_kv_list }
 
 // 2014-07-09 custom "budget" "some_config_opt_for_custom_directive" TRUE 45.30 USD
-custom_value = { quoted_str | date | bool | amount | num_expr | account }
+custom_value = _{ quoted_str | date | bool | amount | num_expr | account }
 custom_value_list = { custom_value+ }
 custom = { date ~ "custom" ~ quoted_str ~ custom_value_list? ~ eol_kv_list }
 
@@ -83,7 +83,7 @@ include = { "include" ~ quoted_str ~ eol }
 note = { date ~ "note" ~ account ~ quoted_str ~ eol_kv_list }
 
 // 2014-05-01 open Liabilities:CreditCard:CapitalOne USD
-open = { date ~ "open" ~ account ~ commodity ~ eol_kv_list }
+open = { date ~ "open" ~ account ~ commodity_list? ~ eol_kv_list }
 
 // option "title" "Ed’s Personal Ledger"
 option = { "option" ~ quoted_str ~ quoted_str ~ eol }
@@ -134,13 +134,10 @@ flag_forecasted = @{ "#" }
 txn_strings = { quoted_str ~ quoted_str? }
 posting = !{
     //   ! Assets:BofA:Checking 1234.32 USD {{502.12 # 9.95 USD, 2018-01-01}} @@ 173.12 US
-	txn_flag? ~ account ~ incomplete_amount ~ cost_spec? ~ (("@@" | "@") ~ price_annotation)?
-    |
-    //   S Assets:BofA:Checking
-    txn_flag? ~ account
+    (account | txn_flag ~ account) ~ ( incomplete_amount ~ cost_spec? ~ (("@@" | "@") ~ price_annotation)? )?
 }
-posting_or_kv_list = !{ key_value | posting | tags_links }
-indented_posting_or_kv_list = ${ indent ~ posting_or_kv_list ~ eol }
+posting_or_kv_list = !{ key_value | posting | tags_links | COMMENT }
+indented_posting_or_kv_list = _{ indent ~ posting_or_kv_list ~ eol }
 eol_posting_or_kv_list = ${ eol ~ indented_posting_or_kv_list* }
 price_annotation = { incomplete_amount }
 // 189.10 USD | USD | 152.41
@@ -154,7 +151,7 @@ cost_spec = {
 // 502.12 # 9.95 USD, 2018-01-01, "hello there"
 cost_comp_list = { cost_comp ~ ("," ~ cost_comp)* }
 // TODO: Need to handle the asterisk case here.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-669
-cost_comp = { date | quoted_str | compound_amount }
+cost_comp = _{ date | quoted_str | compound_amount }
 compound_amount = {
     // e.g. 10 GOOG {502.12 # 9.95 USD}
     //               ^---------------^
@@ -164,3 +161,5 @@ compound_amount = {
     |
     num_expr ~ commodity?
 }
+
+file = { SOI ~ (option | plugin | custom | document | commodity_directive | balance | event | include | note | open | close | pad | price | query | transaction | eol)* ~ EOI}
