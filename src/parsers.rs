@@ -252,8 +252,8 @@ mod tests {
 
     #[test]
     fn posting() {
-        parse_ok!(posting, " Assets:Cash  200 USD\n");
-        parse_ok!(posting, " Assets:Cash\n");
+        parse_ok!(posting, " Assets:Cash  200 USD");
+        parse_ok!(posting, " Assets:Cash");
     }
 
     #[test]
@@ -265,6 +265,22 @@ mod tests {
             2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
                 Liabilities:CreditCard:CapitalOne         -37.45 USD
                 Expenses:Restaurant
+            "
+            )
+        );
+        parse_ok!(transaction, "2019-02-19*\"Foo\"\"Bar\"\n");
+
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+            Liabilities:CreditCard:CapitalOne         -37.45 USD
+            "
+            ),
+            indoc!(
+                "
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
             "
             )
         );
