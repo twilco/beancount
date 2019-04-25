@@ -155,6 +155,14 @@ mod tests {
     }
 
     #[test]
+    fn org_mode() {
+        parse_ok!(org_mode_title, "*\n");
+        parse_ok!(org_mode_title, "*  \n");
+        parse_ok!(org_mode_title, "*  foo\n");
+        parse_fail!(org_mode_title, "  *  foo\n");
+    }
+
+    #[test]
     fn balance() {
         parse_ok!(balance, "2014-08-09 balance Assets:Cash 562.00 USD\n");
         parse_ok!(
