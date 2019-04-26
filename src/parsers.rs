@@ -49,6 +49,7 @@ mod tests {
         parse_ok!(key_value, "key: 200.00");
         parse_ok!(key_value, "key1: 1");
 
+        parse_fail!(key_value, "key    : \"value\"");
         parse_fail!(key_value, "key: bar");
         parse_fail!(key_value, "k: 123");
         parse_fail!(key_value, "Key: 123");
