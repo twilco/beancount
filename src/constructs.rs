@@ -25,7 +25,7 @@ pub struct Account<'a> {
     ty: AccountType,
 
     /// Optional parts of the account following the account type.
-    parts: Option<Vec<&'a str>>,
+    parts: Vec<&'a str>,
 }
 
 /// Allowed account types.
@@ -392,7 +392,7 @@ pub struct Open<'a> {
     account: Account<'a>,
 
     /// Commodities allowed for the opened account.
-    constraint_commodities: Option<&'a str>,
+    constraint_commodities: Vec<&'a str>,
 
     /// Metadata attached to the open directive.
     meta: HashMap<&'a str, &'a str>,
@@ -683,4 +683,29 @@ pub struct Transaction<'a> {
 
     /// Metadata attached to the transaction.
     meta: HashMap<&'a str, &'a str>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Directive<'a> {
+    Open(Open<'a>),
+    Close(Close<'a>),
+    Balance(Balance<'a>),
+    Option(BcOption<'a>),
+    Commodity(Commodity<'a>),
+    Custom(Custom<'a>),
+    Document(Document<'a>),
+    Event(Event<'a>),
+    Include(Include<'a>),
+    Note(Note<'a>),
+    Pad(Pad<'a>),
+    Plugin(Plugin<'a>),
+    Price(Price<'a>),
+    Query(Query<'a>),
+    Transaction(Transaction<'a>),
+    Unsupported,
+}
+
+#[derive(Clone, Debug, PartialEq, TypedBuilder)]
+pub struct Ledger<'a> {
+    directives: Vec<Directive<'a>>,
 }

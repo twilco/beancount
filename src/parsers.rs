@@ -1,8 +1,197 @@
-use pest_derive::Parser;
+use std::collections::HashMap;
 
-#[derive(Parser)]
+use pest::iterators::Pair;
+use pest::Parser;
+use pest_derive::Parser as PestParser;
+
+use crate::constructs as bc;
+
+#[derive(PestParser)]
 #[grammar = "beancount.pest"]
 pub struct BeancountParser;
+
+pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
+    let now = std::time::Instant::now();
+    let parsed = BeancountParser::parse(Rule::file, &input)
+        .expect("successful parse")
+        .next()
+        .unwrap();
+
+    let mut directives = Vec::new();
+
+    for directive_pair in parsed.into_inner() {
+        directives.push(directive(directive_pair))
+    }
+    println!("Parsing time: {:?}", now.elapsed());
+
+    bc::Ledger::builder().directives(directives).build()
+}
+
+fn directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    match directive.as_rule() {
+        Rule::option => {
+            let mut args = directive.into_inner();
+            bc::Directive::Option(
+                bc::BcOption::builder()
+                    .name(args.next().map(get_quoted_str).unwrap())
+                    .val(args.next().map(get_quoted_str).unwrap())
+                    .build(),
+            )
+        }
+        Rule::plugin => {
+            let mut args = directive.into_inner();
+            bc::Directive::Plugin(
+                bc::Plugin::builder()
+                    .module(args.next().map(get_quoted_str).unwrap())
+                    .config(args.next().map(get_quoted_str))
+                    .build(),
+            )
+        }
+        Rule::custom => {
+            let mut args = directive.into_inner();
+            let date = args.next().map(|p| p.as_str()).unwrap();
+            let name = args.next().map(get_quoted_str).unwrap();
+            let custom_args = if args.peek().unwrap().as_rule() == Rule::custom_value_list {
+                args.next()
+                    .unwrap()
+                    .into_inner()
+                    .map(get_quoted_str)
+                    .collect()
+            } else {
+                vec![]
+            };
+            let meta = meta_kv(args.next().unwrap());
+            bc::Directive::Custom(
+                bc::Custom::builder()
+                    .date(name)
+                    .name(date)
+                    .args(custom_args)
+                    .meta(meta)
+                    .build(),
+            )
+        }
+        Rule::include => {
+            let mut args = directive.into_inner();
+            bc::Directive::Include(
+                bc::Include::builder()
+                    .filename(args.next().map(get_quoted_str).unwrap())
+                    .build(),
+            )
+        }
+        Rule::open => {
+            let mut args = directive.into_inner();
+            let date = args.next().map(|p| p.as_str()).unwrap();
+            let acc = args.next().map(account).unwrap();
+            let comm = if args.peek().unwrap().as_rule() == Rule::commodity_list {
+                args.next()
+                    .map(|p| p.into_inner().map(|p| p.as_str()).collect::<Vec<_>>())
+                    .unwrap()
+            } else {
+                vec![]
+            };
+            let meta = args.next().map(meta_kv).unwrap();
+
+            bc::Directive::Open(
+                bc::Open::builder()
+                    .date(date)
+                    .account(acc)
+                    .constraint_commodities(comm)
+                    .meta(meta)
+                    .build(),
+            )
+        }
+        Rule::close => {
+            let mut args = directive.into_inner();
+            let date = args.next().map(|p| p.as_str()).unwrap();
+            let acc = args.next().map(account).unwrap();
+            let meta = args.next().map(meta_kv).unwrap();
+            bc::Directive::Close(
+                bc::Close::builder()
+                    .date(date)
+                    .account(acc)
+                    .meta(meta)
+                    .build(),
+            )
+        }
+        Rule::commodity_directive => {
+            let mut args = directive.into_inner();
+            let date = args.next().map(|p| p.as_str()).unwrap();
+            let name = args.next().map(|p| p.as_str()).unwrap();
+            let meta = args.next().map(meta_kv).unwrap();
+            bc::Directive::Commodity(
+                bc::Commodity::builder()
+                    .date(date)
+                    .name(name)
+                    .meta(meta)
+                    .build(),
+            )
+        }
+        Rule::note => {
+            let mut args = directive.into_inner();
+            let date = args.next().map(|p| p.as_str()).unwrap();
+            let acc = args.next().map(account).unwrap();
+            let desc = args.next().map(|p| p.as_str()).unwrap();
+            let meta = args.next().map(meta_kv).unwrap();
+            bc::Directive::Note(
+                bc::Note::builder()
+                    .date(date)
+                    .account(acc)
+                    .desc(desc)
+                    .meta(meta)
+                    .build(),
+            )
+        }
+        Rule::pad => {
+            let mut args = directive.into_inner();
+            let date = args.next().map(|p| p.as_str()).unwrap();
+            let to_acc = args.next().map(account).unwrap();
+            let from_acc = args.next().map(account).unwrap();
+            let meta = args.next().map(meta_kv).unwrap();
+            bc::Directive::Pad(
+                bc::Pad::builder()
+                    .date(date)
+                    .pad_to_account(to_acc)
+                    .pad_from_account(from_acc)
+                    .meta(meta)
+                    .build(),
+            )
+        }
+        _ => bc::Directive::Unsupported,
+    }
+}
+
+fn account<'i>(pair: Pair<'i, Rule>) -> bc::Account<'i> {
+    debug_assert!(pair.as_rule() == Rule::account);
+    let mut inner = pair.into_inner();
+    let first = inner.next().unwrap().as_str();
+    let account_type = match first {
+        "Assets" => bc::AccountType::Assets,
+        "Liabilities" => bc::AccountType::Liabilities,
+        "Equity" => bc::AccountType::Equity,
+        "Income" => bc::AccountType::Income,
+        "Expenses" => bc::AccountType::Expenses,
+        _ => panic!("Unknown account type"),
+    };
+    let parts: Vec<_> = inner.map(|p| &p.as_str()[1..]).collect();
+    bc::Account::builder().ty(account_type).parts(parts).build()
+}
+
+fn meta_kv<'i>(pair: Pair<'i, Rule>) -> HashMap<&'i str, &'i str> {
+    debug_assert!(pair.as_rule() == Rule::eol_kv_list);
+    pair.into_inner()
+        .map(|p| {
+            let mut inner = p.into_inner();
+            let key = inner.next().unwrap().as_str();
+            let value = inner.next().unwrap().as_str();
+            (key, value)
+        })
+        .collect()
+}
+
+fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> &'i str {
+    debug_assert!(pair.as_rule() == Rule::quoted_str);
+    pair.into_inner().next().unwrap().as_str()
+}
 
 #[cfg(test)]
 mod tests {
@@ -271,10 +460,10 @@ mod tests {
             transaction,
             indoc!(
                 "
-            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
-                Liabilities:CreditCard:CapitalOne         -37.45 USD
-                Expenses:Restaurant
-            "
+        2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+            Liabilities:CreditCard:CapitalOne         -37.45 USD
+            Expenses:Restaurant
+        "
             )
         );
         parse_ok!(transaction, "2019-02-19*\"Foo\"\"Bar\"\n");
@@ -282,20 +471,20 @@ mod tests {
             transaction,
             indoc!(
                 "
-            2018-12-31 * \"Initalize\"
-                Passiver:Foo:Bar                                   123.45 DKK
-                P Passiver:Foo:Bar                                   123.45 DKK
-            "
+        2018-12-31 * \"Initalize\"
+            Passiver:Foo:Bar                                   123.45 DKK
+            P Passiver:Foo:Bar                                   123.45 DKK
+        "
             )
         );
         parse_ok!(
             transaction,
             indoc!(
                 "
-            2018-12-31 * \"Initalize\"
-                ; key: 123
-                Assets:Foo:Bar                                   123.45 DKK
-            "
+        2018-12-31 * \"Initalize\"
+            ; key: 123
+            Assets:Foo:Bar                                   123.45 DKK
+        "
             )
         );
 
@@ -303,14 +492,14 @@ mod tests {
             transaction,
             indoc!(
                 "
-            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
-            Liabilities:CreditCard:CapitalOne         -37.45 USD
-            "
+        2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+        Liabilities:CreditCard:CapitalOne         -37.45 USD
+        "
             ),
             indoc!(
                 "
-            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
-            "
+        2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+        "
             )
         );
     }

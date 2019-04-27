@@ -32,8 +32,8 @@ term = _{ num | "(" ~ num_expr ~ ")" }
 amount = { num_expr ~ commodity }
 
 //// String primitives
-double_quote = @{ "\"" }
-quoted_str = @{ double_quote ~ inner_quoted_str ~ double_quote }
+double_quote = _{ "\"" }
+quoted_str = ${ double_quote ~ inner_quoted_str ~ double_quote }
 inner_quoted_str = @{ quoted_char* }
 quoted_char = @{ escape_sequence | ( !"\"" ~ ANY ) }
 escape_sequence = @{ "\\" ~ ANY }
@@ -45,7 +45,7 @@ commodity_list = @{ commodity ~ ("," ~ commodity)* }
 //// Account primitives
 account_type = @{ UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account_name_piece = @{ ":" ~ (UPPERCASE_LETTER | DECIMAL_NUMBER) ~ (LETTER | DECIMAL_NUMBER | "-")* }
-account = @{ account_type ~ account_name_piece+ }
+account = ${ account_type ~ account_name_piece+ }
 tag_name = @{ ( ASCII_ALPHANUMERIC | "-" | "_" | "/" | "." )+ }
 link = ${ "^" ~ tag_name }
 tag = ${ "#" ~ tag_name }
