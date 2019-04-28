@@ -56,9 +56,9 @@ mod tests {
     }
 
     #[test]
-    fn key_value_list() {
-        parse_ok!(key_value_list, " key: 123\n");
-        parse_ok!(key_value_list, " key: 123\n key2: 456\n");
+    fn eol_kv_list() {
+        parse_ok!(eol_kv_list, "\n key: 123\n");
+        parse_ok!(eol_kv_list, "\n key: 123\n key2: 456\n");
     }
 
     #[test]
@@ -153,6 +153,14 @@ mod tests {
 
         parse_ok!(tag, "#fooæ", "#foo");
         parse_fail!(tag, "#");
+    }
+
+    #[test]
+    fn org_mode() {
+        parse_ok!(org_mode_title, "*\n");
+        parse_ok!(org_mode_title, "*  \n");
+        parse_ok!(org_mode_title, "*  foo\n");
+        parse_fail!(org_mode_title, "  *  foo\n");
     }
 
     #[test]
@@ -253,8 +261,8 @@ mod tests {
 
     #[test]
     fn posting() {
-        parse_ok!(posting, " Assets:Cash  200 USD\n");
-        parse_ok!(posting, " Assets:Cash\n");
+        parse_ok!(posting, "Assets:Cash  200 USD");
+        parse_ok!(posting, "Assets:Cash");
     }
 
     #[test]
@@ -266,6 +274,42 @@ mod tests {
             2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
                 Liabilities:CreditCard:CapitalOne         -37.45 USD
                 Expenses:Restaurant
+            "
+            )
+        );
+        parse_ok!(transaction, "2019-02-19*\"Foo\"\"Bar\"\n");
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
+            2018-12-31 * \"Initalize\"
+                Passiver:Foo:Bar                                   123.45 DKK
+                P Passiver:Foo:Bar                                   123.45 DKK
+            "
+            )
+        );
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
+            2018-12-31 * \"Initalize\"
+                ; key: 123
+                Assets:Foo:Bar                                   123.45 DKK
+            "
+            )
+        );
+
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+            Liabilities:CreditCard:CapitalOne         -37.45 USD
+            "
+            ),
+            indoc!(
+                "
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
             "
             )
         );

@@ -1,149 +1,149 @@
 //// General primitives
-bool = { ^"true" | ^"false" }
-indent = { ws+ }
-comment = { ws* ~ ";" ~ (!NEWLINE ~ ANY)* }
-eol = { ws* ~ NEWLINE | comment ~ NEWLINE }
-indented_comment_line = { indent ~ comment ~ NEWLINE }
-key = { ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
-key_value_value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
-key_value = { key ~ ":" ~ ws* ~ key_value_value }
-key_value_line = { indent ~ key_value ~ eol }
-key_value_list = { key_value_line+ }
-// tab or space
-ws = _{ "	" | " " }
+WHITESPACE = _ { " " | "\t" }
+COMMENT = _{ ";" ~ (!NEWLINE ~ ANY)* }
+
+bool = @{ ^"true" | ^"false" }
+indent = _{ WHITESPACE+ }
+eol = _{ NEWLINE }
+key = @{ ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
+value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
+key_value = !{ key ~ ":" ~ value }
+key_value_line = @{ indent ~ key_value ~ eol }
+eol_kv_list = @{ eol ~ key_value_line* }
 
 //// Date primitives
-year = { ASCII_DIGIT{4} }
-month = { "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
-day = { '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
-date_separator = { "-" | "/" }
-date = { year ~ date_separator ~ month ~ date_separator ~ day }
+year = @{ ASCII_DIGIT{4} }
+month = @{ "0" ~ ASCII_DIGIT | "1" ~ '0'..'2' }
+day = @{ '0'..'2' ~ ASCII_DIGIT | "3" ~ '0'..'1' }
+date_separator = @{ "-" | "/" }
+date = ${ year ~ date_separator ~ month ~ date_separator ~ day }
 
 //// Number primitives
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
-    int = { ("+" | "-")? ~ ( ASCII_DIGIT{4,} | separated_int ) }
-    separated_int = { ASCII_DIGIT{1,3} ~ ( "," ~ ASCII_DIGIT{3} )* }
+    int = @{ ("+" | "-")? ~ ( ASCII_DIGIT{4,} | separated_int ) }
+    separated_int = @{ ASCII_DIGIT{1,3} ~ ( "," ~ ASCII_DIGIT{3} )* }
 operation = _{ add | subtract | multiply | divide }
-    add      = { "+" }
-    subtract = { "-" }
-    multiply = { "*" }
-    divide   = { "/" }
+    add      = @{ "+" }
+    subtract = @{ "-" }
+    multiply = @{ "*" }
+    divide   = @{ "/" }
 num_expr = { term ~ (operation ~ term)* }
 term = _{ num | "(" ~ num_expr ~ ")" }
-amount = { num_expr ~ ws+ ~ commodity }
+amount = { num_expr ~ commodity }
 
 //// String primitives
-double_quote = { "\"" }
-quoted_str = { double_quote ~ inner_quoted_str ~ double_quote }
+double_quote = @{ "\"" }
+quoted_str = @{ double_quote ~ inner_quoted_str ~ double_quote }
 inner_quoted_str = @{ quoted_char* }
-quoted_char = { escape_sequence | ( !"\"" ~ ANY ) }
-escape_sequence = { "\\" ~ ANY }
-valid_non_letter_commodity_char = { "'" |  "_" | "-" | "." }
-commodity_trailing = { valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
+quoted_char = @{ escape_sequence | ( !"\"" ~ ANY ) }
+escape_sequence = @{ "\\" ~ ANY }
+valid_non_letter_commodity_char = @{ "'" |  "_" | "-" | "." }
+commodity_trailing = @{ valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
 commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
+commodity_list = @{ commodity ~ ("," ~ commodity)* }
 
 //// Account primitives
-account_type = { UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
-account_name_piece = { ":" ~ (UPPERCASE_LETTER | DECIMAL_NUMBER) ~ (LETTER | DECIMAL_NUMBER | "-")* }
+account_type = @{ UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
+account_name_piece = @{ ":" ~ (UPPERCASE_LETTER | DECIMAL_NUMBER) ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account = @{ account_type ~ account_name_piece+ }
-tag_name = { ( ASCII_ALPHANUMERIC | "-" | "_" | "/" | "." )+ }
-link = { "^" ~ tag_name }
-tag = { "#" ~ tag_name }
-tags_links = { (link | tag) ~ (ws+ ~ (link | tag))* }
+tag_name = @{ ( ASCII_ALPHANUMERIC | "-" | "_" | "/" | "." )+ }
+link = ${ "^" ~ tag_name }
+tag = ${ "#" ~ tag_name }
+tags_links = { (link | tag)+ }
 
 //// Directives
 
+// * Org mode title
+org_mode_title = @{ "*" ~ (!NEWLINE ~ ANY)* ~ eol }
+
 // 2014-08-09 balance Assets:Cash 562.00 USD
-balance = { date ~ ws+ ~ "balance" ~ ws+ ~ account ~ ws+ ~ amount ~ eol ~ key_value_list? }
+balance = { date ~ "balance" ~ account ~ amount ~ eol_kv_list }
 
 // ; Closing credit card after fraud was detected.
 // 2016-11-28 close Liabilities:CreditCard:CapitalOne
-close = { date ~ ws+ ~ "close" ~ ws+ ~ account ~ eol ~ key_value_list? }
+close = { date ~ "close" ~ account ~ eol_kv_list }
 
 // 2012-01-01 commodity HOOL
-commodity_directive = { date ~ ws+ ~ "commodity" ~ ws+ ~ commodity ~ eol ~ key_value_list? }
+commodity_directive = { date ~ "commodity" ~ commodity ~ eol_kv_list }
 
 // 2014-07-09 custom "budget" "some_config_opt_for_custom_directive" TRUE 45.30 USD
-custom_value = { quoted_str | date | bool | amount | num_expr | account }
-custom_value_list = { custom_value ~ (ws+ ~ custom_value)* }
-custom = { date ~ ws+ ~ "custom" ~ ws+ ~ quoted_str ~ ws+ ~ custom_value_list? ~ eol ~ key_value_list? }
+custom_value = _{ quoted_str | date | bool | amount | num_expr | account }
+custom_value_list = { custom_value+ }
+custom = { date ~ "custom" ~ quoted_str ~ custom_value_list? ~ eol_kv_list }
 
 filename = { quoted_str }
 // 2013-11-03 document Liabilities:CreditCard "/home/joe/stmts/apr-2014.pdf"
-document = { date ~ ws+ ~ "document" ~ ws+ ~ account ~ ws+ ~ filename ~ ws* ~ tags_links? ~ eol ~ key_value_list? }
+document = { date ~ "document" ~ account ~ filename ~ tags_links? ~ eol_kv_list }
 
 // 2014-07-09 event "location" "Paris, France"
-event = { date ~ ws+ ~ "event" ~ ws+ ~ quoted_str ~ ws+ ~ quoted_str ~ eol ~ key_value_list? }
+event = { date ~ "event" ~ quoted_str ~ quoted_str ~ eol_kv_list }
 
 // include "path/to/include/file.beancount"
-include = { "include" ~ ws+ ~ quoted_str ~ eol }
+include = { "include" ~ quoted_str ~ eol }
 
 // 2013-11-03 note Liabilities:CreditCard "Called about fraudulent card."
-note = { date ~ ws+ ~ "note" ~ ws+ ~ account ~ ws+ ~ quoted_str ~ eol ~ key_value_list? }
+note = { date ~ "note" ~ account ~ quoted_str ~ eol_kv_list }
 
 // 2014-05-01 open Liabilities:CreditCard:CapitalOne USD
-open = { date ~ ws+ ~ "open" ~ ws+ ~ account ~ ws+ ~ commodity ~ eol ~ key_value_list? }
+open = { date ~ "open" ~ account ~ commodity_list? ~ eol_kv_list }
 
 // option "title" "Ed’s Personal Ledger"
-option = { "option " ~ quoted_str ~ " " ~ quoted_str ~ eol }
+option = { "option" ~ quoted_str ~ quoted_str ~ eol }
 
 // 2014-06-01 pad Assets:BofA:Checking Equity:Opening-Balances
-pad = { date ~ ws+ ~ "pad" ~ ws+ ~ account ~ ws+ ~ account ~ eol ~ key_value_list? }
+pad = { date ~ "pad" ~ account ~ account ~ eol_kv_list }
 
 // plugin "beancount.plugins.module_name" "configuration data"
-plugin = { "plugin" ~ (ws+ ~ quoted_str){1,2} ~ eol }
+plugin = { "plugin" ~ quoted_str{1,2} ~ eol }
 
 // 2014-07-09 price HOOL 579.18 USD
-price = { date ~ ws+ ~ "price" ~ ws+ ~ commodity ~ ws+ ~ amount ~ eol ~ key_value_list? }
+price = { date ~ "price" ~ commodity ~ amount ~ eol_kv_list }
 
 // 2014-07-09 query "france-balances" "
 //   SELECT account, sum(position) WHERE ‘trip-france-2014’ in tags"
-query = { date ~ ws+ ~ "query" ~ ws+ ~ quoted_str ~ ws+ ~ quoted_str ~ eol ~ key_value_list? }
+query = { date ~ "query" ~ quoted_str ~ quoted_str ~ eol_kv_list }
 
 //// Transaction directive
 
 // 2014-05-05 txn "Cafe Mogador" "Lamb tagine with wine"
 //     Liabilities:CreditCard:CapitalOne         -37.45 USD
 //     Expenses:Restaurant
-transaction = { date ~ ws+ ~ txn_flag ~ ws+ ~ txn_strings ~ (ws+ ~ tags_links)? ~ eol ~ posting_or_kv_list? }
-txn_flag = { flag_okay | flag_warning | flag_padding | flag_summarize | flag_transfer | flag_conversions | flag_unrealized | flag_returns | flag_merging | flag_forecasted }
+transaction = { date ~ txn_flag ~ txn_strings ~ tags_links? ~ eol_posting_or_kv_list }
+txn_flag = @{ flag_okay | flag_warning | flag_padding | flag_summarize | flag_transfer | flag_conversions | flag_unrealized | flag_returns | flag_merging | flag_forecasted }
 // Transactions that have been checked.
-flag_okay = { "*" | "txn" }
+flag_okay = @{ "*" | "txn" }
 // Mark by the user as something to be looked at later on.
-flag_warning = { "!" }
+flag_warning = @{ "!" }
 // Transactions created from padding directives.
-flag_padding = { "P" }
+flag_padding = @{ "P" }
 // Transactions created due to summarization.
-flag_summarize = { "S" }
+flag_summarize = @{ "S" }
 // Transactions created due to balance transfers.
-flag_transfer = { "T" }
+flag_transfer = @{ "T" }
 // Transactions created to account for price conversions.
-flag_conversions = { "C" }
+flag_conversions = @{ "C" }
 // Transactions created due to unrealized gains.
-flag_unrealized = { "U" }
+flag_unrealized = @{ "U" }
 // Transactions that were internalized by returns algorithm.
-flag_returns = { "R" }
+flag_returns = @{ "R" }
 // A flag to mark postings merging together legs for average cost.
-flag_merging = { "M" }
+flag_merging = @{ "M" }
 // A flag to indicate forecasted transactions.  See here for more info:
 // https://bitbucket.org/blais/beancount/src/487cb9b0248427ac6882889b6b8bcc1665ce393e/beancount/plugins/forecast.py?at=default&fileviewer=file-view-default
-flag_forecasted = { "#" }
+flag_forecasted = @{ "#" }
 // TODO: Consider adding support for deprecated pipe syntax.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-341
 // https://github.com/twilco/beancount/issues/2
-txn_strings = { quoted_str ~ (ws+ ~ quoted_str)? }
-posting = {
+txn_strings = { quoted_str ~ quoted_str? }
+posting = !{
     //   ! Assets:BofA:Checking 1234.32 USD {{502.12 # 9.95 USD, 2018-01-01}} @@ 173.12 US
-	indent ~ (txn_flag ~ ws+)? ~ account ~ ws+ ~ incomplete_amount ~ (ws+ ~ cost_spec)? ~ (ws+ ~ ("@@" | "@") ~ ws+ ~ price_annotation)? ~ eol
-    |
-    //   S Assets:BofA:Checking
-    indent ~ (txn_flag ~ ws+)? ~ account ~ eol
+    (account | txn_flag ~ account) ~ ( incomplete_amount ~ cost_spec? ~ (("@@" | "@") ~ price_annotation)? )?
 }
-posting_or_kv_list = {
-  (key_value_line | posting | (indent ~ tags_links ~ NEWLINE) | (indented_comment_line))*
-}
+posting_or_kv_list = !{ key_value | posting | tags_links | COMMENT }
+indented_posting_or_kv_list = _{ indent ~ posting_or_kv_list ~ eol }
+eol_posting_or_kv_list = ${ eol ~ indented_posting_or_kv_list* }
 price_annotation = { incomplete_amount }
 // 189.10 USD | USD | 152.41
-incomplete_amount = { (num_expr ~ ws+ ~ commodity) | commodity | num_expr }
+incomplete_amount = { (num_expr ~ commodity) | commodity | num_expr }
 // {{502.12 # 9.95 USD, 2018-01-01}}
 cost_spec = {
 	("{" ~ cost_comp_list ~ "}")
@@ -151,15 +151,17 @@ cost_spec = {
     ("{{" ~ cost_comp_list ~ "}}")
 }
 // 502.12 # 9.95 USD, 2018-01-01, "hello there"
-cost_comp_list = { cost_comp ~ (ws* ~ "," ~ ws* ~ cost_comp)* }
+cost_comp_list = { cost_comp ~ ("," ~ cost_comp)* }
 // TODO: Need to handle the asterisk case here.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-669
-cost_comp = { date | quoted_str | compound_amount }
+cost_comp = _{ date | quoted_str | compound_amount }
 compound_amount = {
     // e.g. 10 GOOG {502.12 # 9.95 USD}
     //               ^---------------^
-    (num_expr ~ ws*)? ~ "#" ~ ws+ ~ (num_expr ~ ws+)? ~ commodity
+    num_expr? ~ "#" ~ num_expr? ~ commodity
     |
-	(num_expr ~ ws*)? ~ commodity
+	num_expr? ~ commodity
     |
-    num_expr ~ (ws+ ~ commodity)?
+    num_expr ~ commodity?
 }
+
+file = { SOI ~ (org_mode_title | option | plugin | custom | document | commodity_directive | balance | event | include | note | open | close | pad | price | query | transaction | eol)* ~ EOI}
