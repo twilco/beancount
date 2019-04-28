@@ -6,8 +6,8 @@ bool = @{ ^"true" | ^"false" }
 indent = _{ WHITESPACE+ }
 eol = _{ NEWLINE }
 key = @{ ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
-value = { quoted_str | account | date | commodity | tag | bool | amount | num_expr }
-key_value = !{ key ~ ":" ~ value }
+value = !{ quoted_str | account | date | commodity | tag | bool | amount | num_expr }
+key_value = ${ key ~ ":" ~ WHITESPACE* ~ value }
 key_value_line = @{ indent ~ key_value ~ eol }
 eol_kv_list = @{ eol ~ key_value_line* }
 
