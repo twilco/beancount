@@ -31,7 +31,7 @@ pub struct Account<'a> {
 /// Allowed account types.
 ///
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.17ry42rqbuiu>
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum AccountType {
     Assets,
     Liabilities,
@@ -98,10 +98,10 @@ pub struct Balance<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct BcOption<'a> {
     /// Name of the option.
-    name: &'a str,
+    pub name: &'a str,
 
     /// Value of the option.
-    val: &'a str,
+    pub val: &'a str,
 }
 
 /// Represents a `close` directive.  This directive signifies the closing of an account.

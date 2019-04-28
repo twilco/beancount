@@ -10,6 +10,11 @@ use crate::constructs as bc;
 #[grammar = "beancount.pest"]
 pub struct BeancountParser;
 
+#[derive(Debug)]
+struct ParseState<'i> {
+    root_names: HashMap<bc::AccountType, &'i str>,
+}
+
 pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
     let now = std::time::Instant::now();
     let parsed = BeancountParser::parse(Rule::file, &input)
@@ -17,17 +22,51 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
         .next()
         .unwrap();
 
+    let mut state = ParseState {
+        root_names: [
+            (bc::AccountType::Assets, "Assets"),
+            (bc::AccountType::Liabilities, "Liabilities"),
+            (bc::AccountType::Equity, "Equity"),
+            (bc::AccountType::Income, "Income"),
+            (bc::AccountType::Expenses, "Expenses"),
+        ]
+        .iter()
+        .cloned()
+        .collect(),
+    };
+
     let mut directives = Vec::new();
 
     for directive_pair in parsed.into_inner() {
-        directives.push(directive(directive_pair))
+        let dir = directive(directive_pair, &state);
+        match dir {
+            bc::Directive::Option(ref opt) if opt.name == "name_assets" => {
+                state.root_names.insert(bc::AccountType::Assets, opt.val);
+            }
+            bc::Directive::Option(ref opt) if opt.name == "name_liabilities" => {
+                state
+                    .root_names
+                    .insert(bc::AccountType::Liabilities, opt.val);
+            }
+            bc::Directive::Option(ref opt) if opt.name == "name_equity" => {
+                state.root_names.insert(bc::AccountType::Equity, opt.val);
+            }
+            bc::Directive::Option(ref opt) if opt.name == "name_income" => {
+                state.root_names.insert(bc::AccountType::Income, opt.val);
+            }
+            bc::Directive::Option(ref opt) if opt.name == "name_expenses" => {
+                state.root_names.insert(bc::AccountType::Expenses, opt.val);
+            }
+            _ => {}
+        }
+        directives.push(dir);
     }
     println!("Parsing time: {:?}", now.elapsed());
 
     bc::Ledger::builder().directives(directives).build()
 }
 
-fn directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
     match directive.as_rule() {
         Rule::option => {
             let mut args = directive.into_inner();
@@ -81,7 +120,7 @@ fn directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
         Rule::open => {
             let mut args = directive.into_inner();
             let date = args.next().map(|p| p.as_str()).unwrap();
-            let acc = args.next().map(account).unwrap();
+            let acc = args.next().map(|p| account(p, state)).unwrap();
             let comm = if args.peek().unwrap().as_rule() == Rule::commodity_list {
                 args.next()
                     .map(|p| p.into_inner().map(|p| p.as_str()).collect::<Vec<_>>())
@@ -103,7 +142,7 @@ fn directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
         Rule::close => {
             let mut args = directive.into_inner();
             let date = args.next().map(|p| p.as_str()).unwrap();
-            let acc = args.next().map(account).unwrap();
+            let acc = args.next().map(|p| account(p, state)).unwrap();
             let meta = args.next().map(meta_kv).unwrap();
             bc::Directive::Close(
                 bc::Close::builder()
@@ -129,7 +168,7 @@ fn directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
         Rule::note => {
             let mut args = directive.into_inner();
             let date = args.next().map(|p| p.as_str()).unwrap();
-            let acc = args.next().map(account).unwrap();
+            let acc = args.next().map(|p| account(p, state)).unwrap();
             let desc = args.next().map(|p| p.as_str()).unwrap();
             let meta = args.next().map(meta_kv).unwrap();
             bc::Directive::Note(
@@ -144,8 +183,8 @@ fn directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
         Rule::pad => {
             let mut args = directive.into_inner();
             let date = args.next().map(|p| p.as_str()).unwrap();
-            let to_acc = args.next().map(account).unwrap();
-            let from_acc = args.next().map(account).unwrap();
+            let to_acc = args.next().map(|p| account(p, state)).unwrap();
+            let from_acc = args.next().map(|p| account(p, state)).unwrap();
             let meta = args.next().map(meta_kv).unwrap();
             bc::Directive::Pad(
                 bc::Pad::builder()
@@ -160,18 +199,17 @@ fn directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
     }
 }
 
-fn account<'i>(pair: Pair<'i, Rule>) -> bc::Account<'i> {
+fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Account<'i> {
     debug_assert!(pair.as_rule() == Rule::account);
     let mut inner = pair.into_inner();
     let first = inner.next().unwrap().as_str();
-    let account_type = match first {
-        "Assets" => bc::AccountType::Assets,
-        "Liabilities" => bc::AccountType::Liabilities,
-        "Equity" => bc::AccountType::Equity,
-        "Income" => bc::AccountType::Income,
-        "Expenses" => bc::AccountType::Expenses,
-        _ => panic!("Unknown account type"),
-    };
+    let account_type = state
+        .root_names
+        .iter()
+        .filter(|(_, &v)| v == first)
+        .map(|(k, _)| k.clone())
+        .next()
+        .expect("invalid root account");
     let parts: Vec<_> = inner.map(|p| &p.as_str()[1..]).collect();
     bc::Account::builder().ty(account_type).parts(parts).build()
 }
