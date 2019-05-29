@@ -68,135 +68,153 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
 
 fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
     match directive.as_rule() {
-        Rule::option => {
-            let mut args = directive.into_inner();
-            bc::Directive::Option(
-                bc::BcOption::builder()
-                    .name(args.next().map(get_quoted_str).unwrap())
-                    .val(args.next().map(get_quoted_str).unwrap())
-                    .build(),
-            )
-        }
-        Rule::plugin => {
-            let mut args = directive.into_inner();
-            bc::Directive::Plugin(
-                bc::Plugin::builder()
-                    .module(args.next().map(get_quoted_str).unwrap())
-                    .config(args.next().map(get_quoted_str))
-                    .build(),
-            )
-        }
-        Rule::custom => {
-            let mut args = directive.into_inner();
-            let date = args.next().map(|p| p.as_str()).unwrap();
-            let name = args.next().map(get_quoted_str).unwrap();
-            let custom_args = if args.peek().unwrap().as_rule() == Rule::custom_value_list {
-                args.next()
-                    .unwrap()
-                    .into_inner()
-                    .map(get_quoted_str)
-                    .collect()
-            } else {
-                vec![]
-            };
-            let meta = meta_kv(args.next().unwrap());
-            bc::Directive::Custom(
-                bc::Custom::builder()
-                    .date(name)
-                    .name(date)
-                    .args(custom_args)
-                    .meta(meta)
-                    .build(),
-            )
-        }
-        Rule::include => {
-            let mut args = directive.into_inner();
-            bc::Directive::Include(
-                bc::Include::builder()
-                    .filename(args.next().map(get_quoted_str).unwrap())
-                    .build(),
-            )
-        }
-        Rule::open => {
-            let mut args = directive.into_inner();
-            let date = args.next().map(|p| p.as_str()).unwrap();
-            let acc = args.next().map(|p| account(p, state)).unwrap();
-            let comm = if args.peek().unwrap().as_rule() == Rule::commodity_list {
-                args.next()
-                    .map(|p| p.into_inner().map(|p| p.as_str()).collect::<Vec<_>>())
-                    .unwrap()
-            } else {
-                vec![]
-            };
-            let meta = args.next().map(meta_kv).unwrap();
-
-            bc::Directive::Open(
-                bc::Open::builder()
-                    .date(date)
-                    .account(acc)
-                    .constraint_commodities(comm)
-                    .meta(meta)
-                    .build(),
-            )
-        }
-        Rule::close => {
-            let mut args = directive.into_inner();
-            let date = args.next().map(|p| p.as_str()).unwrap();
-            let acc = args.next().map(|p| account(p, state)).unwrap();
-            let meta = args.next().map(meta_kv).unwrap();
-            bc::Directive::Close(
-                bc::Close::builder()
-                    .date(date)
-                    .account(acc)
-                    .meta(meta)
-                    .build(),
-            )
-        }
-        Rule::commodity_directive => {
-            let mut args = directive.into_inner();
-            let date = args.next().map(|p| p.as_str()).unwrap();
-            let name = args.next().map(|p| p.as_str()).unwrap();
-            let meta = args.next().map(meta_kv).unwrap();
-            bc::Directive::Commodity(
-                bc::Commodity::builder()
-                    .date(date)
-                    .name(name)
-                    .meta(meta)
-                    .build(),
-            )
-        }
-        Rule::note => {
-            let mut args = directive.into_inner();
-            let date = args.next().map(|p| p.as_str()).unwrap();
-            let acc = args.next().map(|p| account(p, state)).unwrap();
-            let desc = args.next().map(|p| p.as_str()).unwrap();
-            let meta = args.next().map(meta_kv).unwrap();
-            bc::Directive::Note(
-                bc::Note::builder()
-                    .date(date)
-                    .account(acc)
-                    .desc(desc)
-                    .meta(meta)
-                    .build(),
-            )
-        }
-        Rule::pad => {
-            let mut args = directive.into_inner();
-            let date = args.next().map(|p| p.as_str()).unwrap();
-            let to_acc = args.next().map(|p| account(p, state)).unwrap();
-            let from_acc = args.next().map(|p| account(p, state)).unwrap();
-            let meta = args.next().map(meta_kv).unwrap();
-            bc::Directive::Pad(
-                bc::Pad::builder()
-                    .date(date)
-                    .pad_to_account(to_acc)
-                    .pad_from_account(from_acc)
-                    .meta(meta)
-                    .build(),
-            )
-        }
+        Rule::option => option_directive(directive),
+        Rule::plugin => plugin_directive(directive),
+        Rule::custom => custom_directive(directive),
+        Rule::include => include_directive(directive),
+        Rule::open => open_directive(directive, state),
+        Rule::close => close_directive(directive, state),
+        Rule::commodity_directive => commodity_directive(directive),
+        Rule::note => note_directive(directive, state),
+        Rule::pad => pad_directive(directive, state),
         _ => bc::Directive::Unsupported,
     }
+}
+
+fn option_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    bc::Directive::Option(
+        bc::BcOption::builder()
+            .name(args.next().map(get_quoted_str).unwrap())
+            .val(args.next().map(get_quoted_str).unwrap())
+            .build(),
+    )
+}
+
+fn plugin_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    bc::Directive::Plugin(
+        bc::Plugin::builder()
+            .module(args.next().map(get_quoted_str).unwrap())
+            .config(args.next().map(get_quoted_str))
+            .build(),
+    )
+}
+
+fn custom_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let name = args.next().map(get_quoted_str).unwrap();
+    let custom_args = if args.peek().unwrap().as_rule() == Rule::custom_value_list {
+        args.next()
+            .unwrap()
+            .into_inner()
+            .map(get_quoted_str)
+            .collect()
+    } else {
+        vec![]
+    };
+    let meta = meta_kv(args.next().unwrap());
+    bc::Directive::Custom(
+        bc::Custom::builder()
+            .date(name)
+            .name(date)
+            .args(custom_args)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn include_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    bc::Directive::Include(
+        bc::Include::builder()
+            .filename(args.next().map(get_quoted_str).unwrap())
+            .build(),
+    )
+}
+
+fn open_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let acc = args.next().map(|p| account(p, state)).unwrap();
+    let comm = if args.peek().unwrap().as_rule() == Rule::commodity_list {
+        args.next()
+            .map(|p| p.into_inner().map(|p| p.as_str()).collect::<Vec<_>>())
+            .unwrap()
+    } else {
+        vec![]
+    };
+    let meta = args.next().map(meta_kv).unwrap();
+
+    bc::Directive::Open(
+        bc::Open::builder()
+            .date(date)
+            .account(acc)
+            .constraint_commodities(comm)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn close_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let acc = args.next().map(|p| account(p, state)).unwrap();
+    let meta = args.next().map(meta_kv).unwrap();
+    bc::Directive::Close(
+        bc::Close::builder()
+            .date(date)
+            .account(acc)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn commodity_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let name = args.next().map(|p| p.as_str()).unwrap();
+    let meta = args.next().map(meta_kv).unwrap();
+    bc::Directive::Commodity(
+        bc::Commodity::builder()
+            .date(date)
+            .name(name)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn note_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let acc = args.next().map(|p| account(p, state)).unwrap();
+    let desc = args.next().map(|p| p.as_str()).unwrap();
+    let meta = args.next().map(meta_kv).unwrap();
+    bc::Directive::Note(
+        bc::Note::builder()
+            .date(date)
+            .account(acc)
+            .desc(desc)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn pad_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let to_acc = args.next().map(|p| account(p, state)).unwrap();
+    let from_acc = args.next().map(|p| account(p, state)).unwrap();
+    let meta = args.next().map(meta_kv).unwrap();
+    bc::Directive::Pad(
+        bc::Pad::builder()
+            .date(date)
+            .pad_to_account(to_acc)
+            .pad_from_account(from_acc)
+            .meta(meta)
+            .build(),
+    )
 }
 
 fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Account<'i> {
