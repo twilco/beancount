@@ -79,6 +79,7 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Direc
         Rule::pad => pad_directive(directive, state),
         Rule::query => query_directive(directive),
         Rule::event => event_directive(directive),
+        Rule::document => document_directive(directive, state),
         _ => bc::Directive::Unsupported,
     }
 }
@@ -246,6 +247,22 @@ fn event_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
             .date(date)
             .name(name)
             .val(val)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let account = args.next().map(|p| account(p, state)).unwrap();
+    let path = args.next().map(get_quoted_str).unwrap();
+    let meta = args.next().map(meta_kv).unwrap();
+    bc::Directive::Document(
+        bc::Document::builder()
+            .date(date)
+            .account(account)
+            .path(path)
             .meta(meta)
             .build(),
     )
