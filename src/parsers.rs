@@ -77,6 +77,7 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Direc
         Rule::commodity_directive => commodity_directive(directive),
         Rule::note => note_directive(directive, state),
         Rule::pad => pad_directive(directive, state),
+        Rule::query => query_directive(directive),
         _ => bc::Directive::Unsupported,
     }
 }
@@ -212,6 +213,22 @@ fn pad_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::D
             .date(date)
             .pad_to_account(to_acc)
             .pad_from_account(from_acc)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn query_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let name = args.next().map(get_quoted_str).unwrap();
+    let query = args.next().map(get_quoted_str).unwrap();
+    let meta = args.next().map(meta_kv).unwrap();
+    bc::Directive::Query(
+        bc::Query::builder()
+            .date(date)
+            .name(name)
+            .query(query)
             .meta(meta)
             .build(),
     )
