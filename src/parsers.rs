@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser as PestParser;
+use rust_decimal::Decimal;
 
 use crate::constructs as bc;
 
@@ -285,7 +287,7 @@ fn price_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
     )
 }
 
-fn num_expr<'i>(pair: Pair<'i, Rule>) -> bc::NumExpr<'i> {
+fn num_expr<'i>(pair: Pair<'i, Rule>) -> Decimal {
     debug_assert!(pair.as_rule() == Rule::num_expr);
     use pest::prec_climber::{Assoc, Operator, PrecClimber};
     let climber = PrecClimber::new(vec![
@@ -305,23 +307,21 @@ fn num_expr<'i>(pair: Pair<'i, Rule>) -> bc::NumExpr<'i> {
             (None, term_parts.next().unwrap())
         };
 
-        let num_expr = match pair.as_rule() {
-            Rule::num => bc::NumExpr::Num(pair.as_str()),
+        let mut num_expr = match pair.as_rule() {
+            Rule::num => Decimal::from_str(pair.as_str()).unwrap(),
             Rule::num_expr => num_expr(pair),
             _ => unimplemented!(),
         };
-        match prefix {
-            Some("+") => bc::NumExpr::Pos(Box::new(num_expr)),
-            Some("-") => bc::NumExpr::Neg(Box::new(num_expr)),
-            Some(_) => unimplemented!(),
-            None => num_expr,
+        if let Some("-") = prefix {
+            num_expr.set_sign(!num_expr.is_sign_positive());
         }
+        num_expr
     };
     let infix = |lhs, op: Pair<'i, Rule>, rhs| match op.as_rule() {
-        Rule::add => bc::NumExpr::Add(Box::new(lhs), Box::new(rhs)),
-        Rule::subtract => bc::NumExpr::Subtract(Box::new(lhs), Box::new(rhs)),
-        Rule::multiply => bc::NumExpr::Multiply(Box::new(lhs), Box::new(rhs)),
-        Rule::divide => bc::NumExpr::Divide(Box::new(lhs), Box::new(rhs)),
+        Rule::add => lhs + rhs,
+        Rule::subtract => lhs - rhs,
+        Rule::multiply => lhs * rhs,
+        Rule::divide => lhs / rhs,
         _ => unimplemented!(),
     };
     climber.climb(pair.into_inner(), primary, infix)

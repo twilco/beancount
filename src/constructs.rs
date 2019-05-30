@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use rust_decimal::Decimal;
 use typed_builder::TypedBuilder;
 
 /// A number of units of a certain commodity.
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Amount<'a> {
-    /// A numeric expression giving the value of the amount.
-    pub num: Option<NumExpr<'a>>,
+    /// The (optional) value of the amount.
+    pub num: Option<Decimal>,
 
     /// The commodity of the amount.
     pub commodity: &'a str,
