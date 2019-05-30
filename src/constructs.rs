@@ -712,6 +712,7 @@ pub struct Transaction<'a> {
     meta: HashMap<&'a str, &'a str>,
 }
 
+/// Enum of all directive types.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Directive<'a> {
     Open(Open<'a>),
@@ -732,6 +733,7 @@ pub enum Directive<'a> {
     Unsupported,
 }
 
+/// Represents the complete ledger consisting of a number of directives.
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
 pub struct Ledger<'a> {
     directives: Vec<Directive<'a>>,
