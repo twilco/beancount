@@ -2,6 +2,35 @@ use std::collections::HashMap;
 
 use typed_builder::TypedBuilder;
 
+/// A number of units of a certain commodity.
+#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
+pub struct Amount<'a> {
+    /// A numeric expression giving the value of the amount.
+    pub num: Option<NumExpr<'a>>,
+
+    /// The commodity of the amount.
+    pub commodity: &'a str,
+}
+
+/// Represents a numeric expression.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NumExpr<'a> {
+    /// A number
+    Num(&'a str),
+    /// Unary positive operator `+a`
+    Pos(Box<NumExpr<'a>>),
+    /// Unary negative operator `-a`
+    Neg(Box<NumExpr<'a>>),
+    /// Addition `a + b`
+    Add(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
+    /// Subtraction operator `a - b`
+    Subtract(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
+    /// Multiply operator `a * b`
+    Multiply(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
+    /// Division operator `a / b`
+    Divide(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
+}
+
 /// Represents an account.
 ///
 /// Beancount accumulates commodities in accounts.  An account name is a
@@ -547,13 +576,10 @@ pub struct Price<'a> {
     date: &'a str,
 
     /// The commodity being priced (a.k.a the base commodity).
-    base_comm: &'a str,
+    currency: &'a str,
 
-    /// The commodity being quoted (a.k.a the quote commodity).
-    quote_comm: &'a str,
-
-    /// Value the base commodity is being quoted at.
-    quote_val: f64,
+    /// Value the currency is being quoted at.
+    amount: Amount<'a>,
 
     /// Metadata attached to the price directive.
     meta: HashMap<&'a str, &'a str>,

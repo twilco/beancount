@@ -80,6 +80,7 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Direc
         Rule::query => query_directive(directive),
         Rule::event => event_directive(directive),
         Rule::document => document_directive(directive, state),
+        Rule::price => price_directive(directive),
         _ => bc::Directive::Unsupported,
     }
 }
@@ -268,6 +269,73 @@ fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> 
     )
 }
 
+fn price_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let mut args = directive.into_inner();
+    let date = args.next().map(|p| p.as_str()).unwrap();
+    let commodity = args.next().map(|p| p.as_str()).unwrap();
+    let amount = args.next().map(amount).unwrap();
+    let meta = args.next().map(meta_kv).unwrap();
+    bc::Directive::Price(
+        bc::Price::builder()
+            .date(date)
+            .currency(commodity)
+            .amount(amount)
+            .meta(meta)
+            .build(),
+    )
+}
+
+fn num_expr<'i>(pair: Pair<'i, Rule>) -> bc::NumExpr<'i> {
+    debug_assert!(pair.as_rule() == Rule::num_expr);
+    use pest::prec_climber::{Assoc, Operator, PrecClimber};
+    let climber = PrecClimber::new(vec![
+        Operator::new(Rule::add, Assoc::Left) | Operator::new(Rule::subtract, Assoc::Left),
+        Operator::new(Rule::multiply, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
+    ]);
+    let primary = |pair: Pair<'i, Rule>| {
+        dbg!(pair.as_rule());
+        debug_assert!(pair.as_rule() == Rule::term);
+        let mut term_parts = pair.into_inner();
+        let (prefix, pair) = if term_parts.peek().unwrap().as_rule() == Rule::num_prefix {
+            (
+                term_parts.next().map(|p| p.as_str()),
+                term_parts.next().unwrap(),
+            )
+        } else {
+            (None, term_parts.next().unwrap())
+        };
+
+        let num_expr = match pair.as_rule() {
+            Rule::num => bc::NumExpr::Num(pair.as_str()),
+            Rule::num_expr => num_expr(pair),
+            _ => unimplemented!(),
+        };
+        match prefix {
+            Some("+") => bc::NumExpr::Pos(Box::new(num_expr)),
+            Some("-") => bc::NumExpr::Neg(Box::new(num_expr)),
+            Some(_) => unimplemented!(),
+            None => num_expr,
+        }
+    };
+    let infix = |lhs, op: Pair<'i, Rule>, rhs| match op.as_rule() {
+        Rule::add => bc::NumExpr::Add(Box::new(lhs), Box::new(rhs)),
+        Rule::subtract => bc::NumExpr::Subtract(Box::new(lhs), Box::new(rhs)),
+        Rule::multiply => bc::NumExpr::Multiply(Box::new(lhs), Box::new(rhs)),
+        Rule::divide => bc::NumExpr::Divide(Box::new(lhs), Box::new(rhs)),
+        _ => unimplemented!(),
+    };
+    climber.climb(pair.into_inner(), primary, infix)
+}
+
+fn amount<'i>(pair: Pair<'i, Rule>) -> bc::Amount<'i> {
+    debug_assert!(pair.as_rule() == Rule::amount);
+    let mut inner = pair.into_inner();
+    bc::Amount::builder()
+        .num(Some(num_expr(inner.next().unwrap())))
+        .commodity(inner.next().map(|p| p.as_str()).unwrap())
+        .build()
+}
+
 fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Account<'i> {
     debug_assert!(pair.as_rule() == Rule::account);
     let mut inner = pair.into_inner();
@@ -375,16 +443,32 @@ mod tests {
         parse_ok!(num, "1");
         parse_ok!(num, "1.");
         parse_ok!(num, "1.2");
-        parse_ok!(num, "+1.2");
-        parse_ok!(num, "-1.2");
-        parse_ok!(num, "-1.2");
-        parse_ok!(num, "-1000.2");
-        parse_ok!(num, "-1,000.2");
-        parse_ok!(num, "-1,222,333.4");
+        parse_ok!(num, "1.2");
+        parse_ok!(num, "1.2");
+        parse_ok!(num, "1.2");
+        parse_ok!(num, "1000.2");
+        parse_ok!(num, "1,000.2");
+        parse_ok!(num, "1,222,333.4");
 
         parse_ok!(num, "1234,0", "1234");
         parse_ok!(num, "1,1234", "1,123");
         parse_ok!(num, "1,222,33.4", "1,222");
+    }
+
+    #[test]
+    fn num_expr() {
+        parse_ok!(num_expr, "1");
+        parse_ok!(num_expr, "+1");
+        parse_ok!(num_expr, "-1");
+        parse_ok!(num_expr, "-(1)");
+        parse_ok!(num_expr, "+(1)");
+        parse_ok!(num_expr, "1 + 2");
+        parse_ok!(num_expr, "1 - 2");
+        parse_ok!(num_expr, "1 * 2");
+        parse_ok!(num_expr, "1 / 2");
+        parse_ok!(num_expr, "1+-(2*3)/(4+6)");
+
+        parse_ok!(num_expr, "1+-+(1)", "1");
     }
 
     #[test]
