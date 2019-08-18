@@ -2,4 +2,5 @@
 pub enum Flag {
     Okay,
     Warning,
+    Other(String),
 }

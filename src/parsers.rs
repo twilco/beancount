@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use lazy_static::lazy_static;
@@ -7,6 +7,7 @@ use pest::iterators::{Pair, Pairs};
 use pest::prec_climber::{Assoc, Operator, PrecClimber};
 use pest::Parser;
 use pest_derive::Parser as PestParser;
+use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 
 use crate::core as bc;
@@ -17,15 +18,33 @@ macro_rules! construct {
         let $builder = match $pairs.peek() {
             Some(ref p) if p.as_rule() == $rule => {
                 let f = $then;
-                $builder.$field(f($pairs.next().unwrap()))
+                $builder.$field(f($pairs.next().expect(stringify!($field))))
             },
             _ => $builder.$field($else),
         };
         construct!(@fields, $builder, $pairs, $($rest)*)
     };
+    ( @fields, $builder:ident, $pairs:ident, inner { $($field:tt)* } $($rest:tt)* ) => {
+        let mut inner = $pairs.next().expect("inner pair").into_inner();
+        construct!(@fields, $builder, inner, $($field)*);
+        construct!(@fields, $builder, $pairs, $($rest)*)
+    };
+    ( @fields, $builder:ident, $pairs:ident, let $pat:pat = from $name:ident $block:block; $($rest:tt)* ) => {
+        let $name = $pairs.next().unwrap();
+        let $pat = $block;
+        construct!(@fields, $builder, $pairs, $($rest)*)
+    };
+    ( @fields, $builder:ident, $pairs:ident, $field:ident ?= $f:expr; $($rest:tt)* ) => {
+        let $builder = $builder.$field($pairs.next().map($f));
+        construct!(@fields, $builder, $pairs, $($rest)*)
+    };
+    ( @fields, $builder:ident, $pairs:ident, $field:ident := $val:expr; $($rest:tt)* ) => {
+        let $builder = $builder.$field($val);
+        construct!(@fields, $builder, $pairs, $($rest)*)
+    };
     ( @fields, $builder:ident, $pairs:ident, $field:ident = $f:expr; $($rest:tt)* ) => {
         let f = $f;
-        let $builder = $builder.$field(f($pairs.next().unwrap()));
+        let $builder = $builder.$field(f($pairs.next().expect(stringify!($field))));
         construct!(@fields, $builder, $pairs, $($rest)*)
     };
     ( $builder:ty : $pair:expr => { $($field:tt)* } ) => {
@@ -135,6 +154,7 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive
         Rule::event => event_directive(directive),
         Rule::document => document_directive(directive, state),
         Rule::price => price_directive(directive),
+        Rule::transaction => transaction_directive(directive, state),
         _ => bc::Directive::Unsupported,
     }
 }
@@ -271,8 +291,6 @@ fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::
             date = date;
             account = |p| account(p, state);
             path = get_quoted_str;
-            tags = |_| HashSet::new();
-            links = |_| HashSet::new();
             meta = meta_kv;
         }
     })
@@ -287,6 +305,87 @@ fn price_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
             meta = meta_kv;
         }
     })
+}
+
+fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    bc::Directive::Transaction(construct! {
+        bc::Transaction: directive => {
+            date = date;
+            flag = flag;
+            inner {
+                payee ?= get_quoted_str;
+                narration ?= get_quoted_str;
+            }
+            let (meta, postings) = from pair {
+                let mut postings: Vec<bc::Posting<'i>> = Vec::new();
+                let mut tx_meta = bc::Meta::new();
+                for p in pair.into_inner() {
+                    match p.as_rule() {
+                        Rule::key_value => {
+                            let (k, v) = meta_kv_pair(p);
+                            if let Some(last) = postings.last_mut() {
+                                last.meta.insert(k, v);
+                            } else {
+                                tx_meta.insert(k, v);
+                            }
+                        }
+                        Rule::posting => {
+                            postings.push(posting(p, state));
+                        }
+                        _ => unimplemented!()
+                    }
+                }
+                (tx_meta, postings)
+            };
+            postings := Some(postings);
+            meta := meta;
+        }
+    })
+}
+
+fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Posting<'i> {
+    let mut inner = pair.into_inner();
+    let flag = optional_rule(Rule::txn_flag, &mut inner).map(flag);
+    let account = inner.next().map(|p| account(p, state)).unwrap();
+    let units = optional_rule(Rule::incomplete_amount, &mut inner)
+        .map(incomplete_amount)
+        .unwrap_or_else(|| bc::IncompleteAmount::builder().build());
+    let cost = optional_rule(Rule::cost_spec, &mut inner).map(cost_spec);
+    let price_anno = optional_rule(Rule::price_annotation, &mut inner).map(price_annotation);
+    let price = match (price_anno, units.num) {
+        (
+            Some((
+                true,
+                bc::IncompleteAmount {
+                    num: Some(n),
+                    commodity,
+                },
+            )),
+            Some(n_units),
+        ) => {
+            let num = if n_units.is_zero() {
+                0.into()
+            } else {
+                n / n_units.abs()
+            };
+            Some(
+                bc::IncompleteAmount::builder()
+                    .num(Some(num))
+                    .commodity(commodity)
+                    .build(),
+            )
+        }
+        (Some((_, p)), _) => Some(p),
+        (None, _) => None,
+    };
+    bc::Posting {
+        flag,
+        account,
+        units,
+        cost,
+        price,
+        meta: bc::Meta::new(),
+    }
 }
 
 fn num_expr<'i>(pair: Pair<'i, Rule>) -> Decimal {
@@ -324,10 +423,68 @@ fn amount<'i>(pair: Pair<'i, Rule>) -> bc::Amount<'i> {
     debug_assert!(pair.as_rule() == Rule::amount);
     construct! {
         bc::Amount: pair => {
-            num = |p| Some(num_expr(p));
+            num = num_expr;
             commodity = as_str;
         }
     }
+}
+
+fn incomplete_amount<'i>(pair: Pair<'i, Rule>) -> bc::IncompleteAmount<'i> {
+    debug_assert!(pair.as_rule() == Rule::incomplete_amount);
+    construct! {
+        bc::IncompleteAmount: pair => {
+            num = if Rule::num_expr {
+                |p| Some(num_expr(p))
+            } else {
+                None
+            };
+            commodity = if Rule::commodity {
+                |p| Some(as_str(p).into())
+            } else {
+                None
+            };
+        }
+    }
+}
+
+fn cost_spec<'i>(pair: Pair<'i, Rule>) -> bc::CostSpec<'i> {
+    debug_assert!(pair.as_rule() == Rule::cost_spec);
+    let mut amount = (None, None, None);
+    let mut date_ = None;
+    let mut label = None;
+    let inner = pair.into_inner().next().unwrap();
+    let typ = inner.as_rule();
+    for p in inner.into_inner() {
+        match p.as_rule() {
+            Rule::date => date_ = Some(date(p).into()),
+            Rule::quoted_str => label = Some(get_quoted_str(p)),
+            Rule::compound_amount => {
+                amount = compound_amount(p);
+            }
+            _ => unimplemented!(),
+        }
+    }
+    if typ == Rule::cost_spec_total {
+        if !amount.1.is_none() {
+            panic!("Per-unit cost may not be specified using total cost");
+        }
+        amount = (None, amount.0, amount.2);
+    }
+    bc::CostSpec::builder()
+        .number_per(amount.0)
+        .number_total(amount.1)
+        .currency(amount.2)
+        .date(date_)
+        .label(label)
+        .build()
+}
+
+fn price_annotation<'i>(pair: Pair<'i, Rule>) -> (bool, bc::IncompleteAmount<'i>) {
+    debug_assert!(pair.as_rule() == Rule::price_annotation);
+    let inner = pair.into_inner().next().unwrap();
+    let is_total = inner.as_rule() == Rule::price_annotation_total;
+    let amount = incomplete_amount(inner.into_inner().next().unwrap());
+    (is_total, amount)
 }
 
 fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Account<'i> {
@@ -355,19 +512,53 @@ fn date<'i>(pair: Pair<'i, Rule>) -> &'i str {
 
 fn meta_kv<'i>(pair: Pair<'i, Rule>) -> HashMap<&'i str, &'i str> {
     debug_assert!(pair.as_rule() == Rule::eol_kv_list);
-    pair.into_inner()
-        .map(|p| {
-            let mut inner = p.into_inner();
-            let key = inner.next().unwrap().as_str();
-            let value = inner.next().unwrap().as_str();
-            (key, value)
-        })
-        .collect()
+    pair.into_inner().map(meta_kv_pair).collect()
+}
+
+fn meta_kv_pair<'i>(pair: Pair<'i, Rule>) -> (&'i str, &'i str) {
+    debug_assert!(pair.as_rule() == Rule::key_value);
+    let mut inner = pair.into_inner();
+    let key = inner.next().unwrap().as_str();
+    let value = inner.next().unwrap().as_str();
+    (key, value)
 }
 
 fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> Cow<'i, str> {
     debug_assert!(pair.as_rule() == Rule::quoted_str);
     pair.into_inner().next().unwrap().as_str().into()
+}
+
+fn flag<'i>(pair: Pair<'i, Rule>) -> bc::Flag {
+    match pair.as_str() {
+        "*" | "txn" => bc::Flag::Okay,
+        "!" => bc::Flag::Warning,
+        s => bc::Flag::Other(s.to_string()),
+    }
+}
+
+fn compound_amount<'i>(
+    pair: Pair<'i, Rule>,
+) -> (Option<Decimal>, Option<Decimal>, Option<Cow<'i, str>>) {
+    let mut number_per = None;
+    let mut number_total = None;
+    let mut currency = None;
+    for p in pair.into_inner() {
+        match p.as_rule() {
+            Rule::num_expr => {
+                let num = Some(num_expr(p));
+                if number_per.is_none() {
+                    number_per = num;
+                } else {
+                    number_total = num;
+                }
+            }
+            Rule::commodity => {
+                currency = Some(p.as_str().into());
+            }
+            _ => unimplemented!(),
+        }
+    }
+    (number_per, number_total, currency)
 }
 
 #[cfg(test)]

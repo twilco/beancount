@@ -5,7 +5,7 @@ use rust_decimal::Decimal;
 use typed_builder::TypedBuilder;
 
 use super::account::Account;
-use super::amount::Amount;
+use super::amount::{Amount, IncompleteAmount};
 use super::flags::Flag;
 use super::position::CostSpec;
 use super::{Currency, Date, Link, Meta, Tag};
@@ -249,9 +249,11 @@ pub struct Document<'a> {
     path: Cow<'a, str>,
 
     /// Tags associated with the document.
+    #[builder(default)]
     tags: HashSet<Tag<'a>>,
 
     /// Links associated with the document.
+    #[builder(default)]
     links: HashSet<Link<'a>>,
 
     /// Metadata attached to the document directive.
@@ -443,20 +445,24 @@ pub struct Pad<'a> {
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
 pub struct Posting<'a> {
     /// Account being posted to.
-    account: Account<'a>,
+    pub account: Account<'a>,
 
     /// The amount being posted.
-    units: Amount<'a>,
+    pub units: IncompleteAmount<'a>,
 
     /// The cost of this posting.
-    cost: Option<CostSpec<'a>>,
+    #[builder(default)]
+    pub cost: Option<CostSpec<'a>>,
 
     /// The price of this posting.
-    price: Option<Amount<'a>>,
+    #[builder(default)]
+    pub price: Option<IncompleteAmount<'a>>,
 
-    flag: Option<Flag>,
+    #[builder(default)]
+    pub flag: Option<Flag>,
 
-    meta: Meta<'a>,
+    #[builder(default)]
+    pub meta: Meta<'a>,
 }
 
 /// Represents a `plugin` directive.
@@ -612,6 +618,8 @@ pub struct Query<'a> {
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.up4dj751q84w>
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
 pub struct Transaction<'a> {
+    date: Date<'a>,
+
     /// Whether or not a transaction is considered complete.
     ///
     /// `*` or `txn`: Completed transaction, known amounts, “this looks correct.”
@@ -625,14 +633,18 @@ pub struct Transaction<'a> {
     narration: Option<Cow<'a, str>>,
 
     /// Tags associated with the transaction.
+    #[builder(default)]
     tags: HashSet<Tag<'a>>,
 
     /// Links associated with the transactions.
+    #[builder(default)]
     links: HashSet<Link<'a>>,
 
     /// Postings belonging to this transaction.
+    #[builder(default)]
     postings: Option<Vec<Posting<'a>>>,
 
     /// Metadata attached to the transaction.
+    #[builder(default)]
     meta: Meta<'a>,
 }

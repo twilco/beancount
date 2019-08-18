@@ -5,7 +5,7 @@ use typed_builder::TypedBuilder;
 
 pub use account::Account;
 pub use account_types::AccountType;
-pub use amount::Amount;
+pub use amount::{Amount, IncompleteAmount};
 pub use directives::*;
 pub use flags::Flag;
 pub use position::CostSpec;

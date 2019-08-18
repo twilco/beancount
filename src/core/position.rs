@@ -22,13 +22,18 @@ pub struct Cost<'a> {
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.mtqrwt24wnzs>
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct CostSpec<'a> {
+    #[builder(default)]
     pub number_per: Option<Decimal>,
+    #[builder(default)]
     pub number_total: Option<Decimal>,
     /// The type of commodity for this cost.
+    #[builder(default)]
     pub currency: Option<Cow<'a, str>>,
     /// The date of the at-cost.
+    #[builder(default)]
     pub date: Option<Cow<'a, str>>,
     /// The label of the cost.
+    #[builder(default)]
     pub label: Option<Cow<'a, str>>,
 }
 
