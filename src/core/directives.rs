@@ -1,16 +1,34 @@
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::HashSet;
 
 use rust_decimal::Decimal;
 use typed_builder::TypedBuilder;
 
-/// A number of units of a certain commodity.
-#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
-pub struct Amount<'a> {
-    /// The (optional) value of the amount.
-    pub num: Option<Decimal>,
+use super::account::Account;
+use super::amount::Amount;
+use super::flags::Flag;
+use super::position::CostSpec;
+use super::{Currency, Date, Link, Meta, Tag};
 
-    /// The commodity of the amount.
-    pub commodity: &'a str,
+/// Enum of all directive types.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Directive<'a> {
+    Open(Open<'a>),
+    Close(Close<'a>),
+    Balance(Balance<'a>),
+    Option(BcOption<'a>),
+    Commodity(Commodity<'a>),
+    Custom(Custom<'a>),
+    Document(Document<'a>),
+    Event(Event<'a>),
+    Include(Include<'a>),
+    Note(Note<'a>),
+    Pad(Pad<'a>),
+    Plugin(Plugin<'a>),
+    Price(Price<'a>),
+    Query(Query<'a>),
+    Transaction(Transaction<'a>),
+    Unsupported,
 }
 
 /// Represents a numeric expression.
@@ -30,44 +48,6 @@ pub enum NumExpr<'a> {
     Multiply(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
     /// Division operator `a / b`
     Divide(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
-}
-
-/// Represents an account.
-///
-/// Beancount accumulates commodities in accounts.  An account name is a
-/// colon-separated list of capitalized words which begin with a letter, and whose first word must
-/// be one of the five acceptable account types.
-///
-/// Some example accounts:
-///
-/// ```text
-/// Assets:US:BofA:Checking
-/// Liabilities:CA:RBC:CreditCard
-/// Equity:Retained-Earnings
-/// Income:US:Acme:Salary
-/// Expenses:Food:Groceries
-/// ```
-///
-/// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.17ry42rqbuiu>
-#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
-pub struct Account<'a> {
-    /// Type of the account.
-    ty: AccountType,
-
-    /// Optional parts of the account following the account type.
-    parts: Vec<&'a str>,
-}
-
-/// Allowed account types.
-///
-/// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.17ry42rqbuiu>
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum AccountType {
-    Assets,
-    Liabilities,
-    Equity,
-    Income,
-    Expenses,
 }
 
 /// Represents a `balance` directive, which is a way for you to input your statement balance into
@@ -95,19 +75,20 @@ pub enum AccountType {
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
 pub struct Balance<'a> {
     /// Date of the balance.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Account to check the balance of.
     account: Account<'a>,
 
     /// Amount to balance.
-    amount: f64,
+    amount: Amount<'a>,
 
-    /// Type of commodity to balance.
-    comm: &'a str,
+    #[builder(default)]
+    tolerance: Option<Decimal>,
 
+    // diff_amount: Option<Amount>,
     /// Metadata attached to the balance directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents a Beancount `option`, which are configuration points global to the file.
@@ -122,16 +103,17 @@ pub struct Balance<'a> {
 ///
 /// ```text
 /// option "title" "Ed’s Personal Ledger"
-/// ````
+/// ```
 ///
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.e2iyrfrmstl>
+
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct BcOption<'a> {
     /// Name of the option.
-    pub name: &'a str,
+    pub name: Cow<'a, str>,
 
     /// Value of the option.
-    pub val: &'a str,
+    pub val: Cow<'a, str>,
 }
 
 /// Represents a `close` directive.  This directive signifies the closing of an account.
@@ -153,13 +135,13 @@ pub struct BcOption<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Close<'a> {
     /// Date the account was closed.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Account being closed.
     account: Account<'a>,
 
     /// Metadata attached to the close directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents a `commodity` directive.  This directive allows you to declare commodities,
@@ -190,33 +172,13 @@ pub struct Close<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Commodity<'a> {
     /// Date the commodity was declared.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Commodity name.
-    name: &'a str,
+    name: Currency<'a>,
 
     /// Metadata attached to the commodity directive.
-    meta: HashMap<&'a str, &'a str>,
-}
-
-// TODO: Important Note. Amounts specified as either per-share or total prices or costs are always unsigned. It is an error to use a negative sign or a negative cost and Beancount will raise an error if you attempt to do so.
-
-/// Represents a "cost", which typically belongs to a [Posting](struct.Posting.html).
-///
-/// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.mtqrwt24wnzs>
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
-pub struct Cost<'a> {
-    /// The type of commodity for this cost.
-    comm: Option<&'a str>,
-
-    /// The amount of whatever commodity used in this cost.
-    amount: Option<f64>,
-
-    /// The date of the at-cost.
-    date: Option<&'a str>,
-
-    /// The label of the cost.
-    label: Option<&'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents a `custom` directive, which is a generic directive provided to allow clients to
@@ -247,16 +209,16 @@ pub struct Cost<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Custom<'a> {
     /// Date associated with the custom directive.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Custom directive name.
-    name: &'a str,
+    name: Cow<'a, str>,
 
     /// Arbitrary number of custom directive arguments.
-    args: Vec<&'a str>,
+    args: Vec<Cow<'a, str>>,
 
     /// Metadata attached to the custom directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents a `document` directive.  A `document` directive can be used to attach an external
@@ -278,16 +240,22 @@ pub struct Custom<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Document<'a> {
     /// Date the document was linked.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Account document is added to.
     account: Account<'a>,
 
     /// Filesystem path to the document.
-    path: &'a str,
+    path: Cow<'a, str>,
+
+    /// Tags associated with the document.
+    tags: HashSet<Tag<'a>>,
+
+    /// Links associated with the document.
+    links: HashSet<Link<'a>>,
 
     /// Metadata attached to the document directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents an `event` directive.  `event` directives are used to track the value of some
@@ -309,16 +277,16 @@ pub struct Document<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Event<'a> {
     /// Date the event occurred.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Name of the event.
-    name: &'a str,
+    name: Cow<'a, str>,
 
     /// New value of the event.
-    val: &'a str,
+    description: Cow<'a, str>,
 
     /// Metadata attached to the event directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents an `include` directive.  The `include` directive, as it sounds, includes another
@@ -340,32 +308,7 @@ pub struct Event<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Include<'a> {
     /// Fully qualified filename, including any necessary path segments.
-    filename: &'a str,
-}
-
-/// Links provide a way to link transactions together.  You may think of the link as a special kind
-/// of tag that can be used to group together a set of financially related transactions over time.
-///
-/// For example, you may use links to group together transactions that are each related with a
-/// specific  invoice. This  allows to track payments (or write-offs) associated with the invoice:
-///
-/// Some transactions that have links:
-///
-/// ```text
-/// 2014-02-05 * "Invoice for January" ^invoice-pepe-studios-jan14
-///     Income:Clients:PepeStudios           -8450.00 USD
-///     Assets:AccountsReceivable
-///
-/// 2014-02-20 * "Check deposit - payment from Pepe" ^invoice-pepe-studios-jan14
-///     Assets:BofA:Checking                  8450.00 USD
-///     Assets:AccountsReceivable
-/// ```
-///
-/// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.k4v5vkjukel7>
-#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
-pub struct Link<'a> {
-    /// Name of the link.
-    name: &'a str,
+    filename: Cow<'a, str>,
 }
 
 /// Represents a `note` directive.  A `note` directive is simply used to attach a dated comment to
@@ -381,22 +324,31 @@ pub struct Link<'a> {
 ///
 /// ```text
 /// 2013-11-03 note Liabilities:CreditCard "Called about fraudulent card."
-/// ````
+/// ```
 ///
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.c4cyaa6o6rqm>
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Note<'a> {
     /// Date of the note.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Account being noted.
     account: Account<'a>,
 
     /// Note description.
-    desc: &'a str,
+    comment: Cow<'a, str>,
 
     /// Metadata attached to the note directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Booking {
+    Strict,
+    None,
+    Average,
+    Fifo,
+    Lifo,
 }
 
 /// Represents a `open` directive.  This directive signifies the opening of an account.
@@ -416,16 +368,20 @@ pub struct Note<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Open<'a> {
     /// Date the account was opened.
-    date: &'a str,
+    pub date: Date<'a>,
 
     /// Account being opened.
-    account: Account<'a>,
+    pub account: Account<'a>,
 
     /// Commodities allowed for the opened account.
-    constraint_commodities: Vec<&'a str>,
+    pub currencies: Vec<Currency<'a>>,
+
+    /// Booking method
+    #[builder(default=Booking::Strict)]
+    pub booking: Booking,
 
     /// Metadata attached to the open directive.
-    meta: HashMap<&'a str, &'a str>,
+    pub meta: Meta<'a>,
 }
 
 /// Represents a `pad` directive.  A `pad` directive automatically inserts a transaction that will
@@ -451,7 +407,7 @@ pub struct Open<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Pad<'a> {
     /// Date of the pad.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Account to pad into.
     pad_to_account: Account<'a>,
@@ -460,7 +416,7 @@ pub struct Pad<'a> {
     pad_from_account: Account<'a>,
 
     /// Metadata attached to the pad directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents a transaction posting.  Postings represent a single amount being deposited to or
@@ -490,29 +446,17 @@ pub struct Posting<'a> {
     account: Account<'a>,
 
     /// The amount being posted.
-    amount: Option<f64>,
-
-    /// The type of commodity being posted.
-    comm: Option<&'a str>,
-
-    /// The price of this posting.
-    price: Option<PostingPrice<'a>>,
+    units: Amount<'a>,
 
     /// The cost of this posting.
-    cost: Option<Cost<'a>>,
-}
+    cost: Option<CostSpec<'a>>,
 
-/// Represents a price that belongs to a posting.  Posting prices enable use cases where you want
-/// to convert from one currency to another.
-///
-/// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.mtqrwt24wnzs>
-#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
-pub struct PostingPrice<'a> {
-    /// The type of commodity for this price.
-    comm: &'a str,
+    /// The price of this posting.
+    price: Option<Amount<'a>>,
 
-    /// The amount of whatever commodity used in this price.
-    amount: f64,
+    flag: Option<Flag>,
+
+    meta: Meta<'a>,
 }
 
 /// Represents a `plugin` directive.
@@ -538,10 +482,10 @@ pub struct PostingPrice<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Plugin<'a> {
     /// Full module name of the plugin.
-    module: &'a str,
+    module: Cow<'a, str>,
 
     /// Configuration data to be passed to the plugin.
-    config: Option<&'a str>,
+    config: Option<Cow<'a, str>>,
 }
 
 /// Represents a `price` directive, which establishes the rate of exchange between one commodity and
@@ -574,16 +518,16 @@ pub struct Plugin<'a> {
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
 pub struct Price<'a> {
     /// Date of the price specification.
-    date: &'a str,
+    date: Date<'a>,
 
     /// The commodity being priced (a.k.a the base commodity).
-    currency: &'a str,
+    currency: Currency<'a>,
 
     /// Value the currency is being quoted at.
     amount: Amount<'a>,
 
     /// Metadata attached to the price directive.
-    meta: HashMap<&'a str, &'a str>,
+    meta: Meta<'a>,
 }
 
 /// Represents a `query` directive.  `query` directives allow you to insert a query in the usual
@@ -609,35 +553,16 @@ pub struct Price<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Query<'a> {
     /// Date on which the query should be run.
-    date: &'a str,
+    date: Date<'a>,
 
     /// Name of the query.
-    name: &'a str,
+    name: Cow<'a, str>,
 
     /// Query contents.
-    query: &'a str,
+    query_string: Cow<'a, str>,
 
     /// Metadata attached to the query directive.
-    meta: HashMap<&'a str, &'a str>,
-}
-
-/// Tag associated with a transaction directive.  Tags allow you to mark a subset of transactions,
-/// enabling filtering on a tag(s) when generating a report.
-///
-/// In the below transaction, #berlin-trip-2014 is the tag:
-///
-/// ```text
-///
-/// 2014-04-23 * "Flight to Berlin" #berlin-trip-2014
-///     Expenses:Flights              -1230.27 USD
-///     Liabilities:CreditCard
-/// ```
-///
-/// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.oivvp5olom2v>
-#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
-pub struct Tag<'a> {
-    /// Name of the tag.
-    name: &'a str,
+    meta: Meta<'a>,
 }
 
 /// Represents a `txn` (or `*` or `!`) directive.
@@ -691,50 +616,23 @@ pub struct Transaction<'a> {
     ///
     /// `*` or `txn`: Completed transaction, known amounts, “this looks correct.”
     /// `!`: Incomplete transaction, needs confirmation or revision, “this looks incorrect.”
-    completed: bool,
+    flag: Flag,
+
+    /// Payee of this transaction.
+    payee: Option<Cow<'a, str>>,
+
+    /// Narration of this transaction.
+    narration: Option<Cow<'a, str>>,
+
+    /// Tags associated with the transaction.
+    tags: HashSet<Tag<'a>>,
+
+    /// Links associated with the transactions.
+    links: HashSet<Link<'a>>,
 
     /// Postings belonging to this transaction.
     postings: Option<Vec<Posting<'a>>>,
 
-    /// Payee of this transaction.
-    payee: Option<&'a str>,
-
-    /// Narration of this transaction.
-    narration: Option<&'a str>,
-
-    /// Tags associated with the transaction.
-    tags: Option<Vec<Tag<'a>>>,
-
-    /// Links associated with the transactions.
-    links: Option<Vec<Link<'a>>>,
-
     /// Metadata attached to the transaction.
-    meta: HashMap<&'a str, &'a str>,
-}
-
-/// Enum of all directive types.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Directive<'a> {
-    Open(Open<'a>),
-    Close(Close<'a>),
-    Balance(Balance<'a>),
-    Option(BcOption<'a>),
-    Commodity(Commodity<'a>),
-    Custom(Custom<'a>),
-    Document(Document<'a>),
-    Event(Event<'a>),
-    Include(Include<'a>),
-    Note(Note<'a>),
-    Pad(Pad<'a>),
-    Plugin(Plugin<'a>),
-    Price(Price<'a>),
-    Query(Query<'a>),
-    Transaction(Transaction<'a>),
-    Unsupported,
-}
-
-/// Represents the complete ledger consisting of a number of directives.
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
-pub struct Ledger<'a> {
-    directives: Vec<Directive<'a>>,
+    meta: Meta<'a>,
 }

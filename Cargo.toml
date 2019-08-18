@@ -12,8 +12,9 @@ edition = "2018"
 travis-ci = { repository = "twilco/beancount", branch = "master" }
 
 [dependencies]
-typed-builder = "0.1.1"
+typed-builder = "0.3"
 pest = "2.1.0"
 pest_derive = "2.1.0"
 indoc = "0.3"
 rust_decimal = "1.0"
+lazy_static = "1.3"

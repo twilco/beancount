@@ -41,7 +41,7 @@ escape_sequence = @{ "\\" ~ ANY }
 valid_non_letter_commodity_char = @{ "'" |  "_" | "-" | "." }
 commodity_trailing = @{ valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
 commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
-commodity_list = @{ commodity ~ ("," ~ commodity)* }
+commodity_list = ${ commodity ~ ("," ~ commodity)* }
 
 //// Account primitives
 account_type = @{ UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
@@ -72,9 +72,8 @@ custom_value = _{ quoted_str | date | bool | amount | num_expr | account }
 custom_value_list = { custom_value+ }
 custom = { date ~ "custom" ~ quoted_str ~ custom_value_list? ~ eol_kv_list }
 
-filename = { quoted_str }
 // 2013-11-03 document Liabilities:CreditCard "/home/joe/stmts/apr-2014.pdf"
-document = { date ~ "document" ~ account ~ filename ~ tags_links? ~ eol_kv_list }
+document = { date ~ "document" ~ account ~ quoted_str ~ tags_links? ~ eol_kv_list }
 
 // 2014-07-09 event "location" "Paris, France"
 event = { date ~ "event" ~ quoted_str ~ quoted_str ~ eol_kv_list }

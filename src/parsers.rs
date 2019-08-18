@@ -1,20 +1,64 @@
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
-use pest::iterators::Pair;
+use lazy_static::lazy_static;
+use pest::iterators::{Pair, Pairs};
+use pest::prec_climber::{Assoc, Operator, PrecClimber};
 use pest::Parser;
 use pest_derive::Parser as PestParser;
 use rust_decimal::Decimal;
 
-use crate::constructs as bc;
+use crate::core as bc;
+
+macro_rules! construct {
+    ( @fields, $builder:ident, $pairs:ident, ) => {};
+    ( @fields, $builder:ident, $pairs:ident, $field:ident = if $rule:path $then:block else $else:block; $($rest:tt)* ) => {
+        let $builder = match $pairs.peek() {
+            Some(ref p) if p.as_rule() == $rule => {
+                let f = $then;
+                $builder.$field(f($pairs.next().unwrap()))
+            },
+            _ => $builder.$field($else),
+        };
+        construct!(@fields, $builder, $pairs, $($rest)*)
+    };
+    ( @fields, $builder:ident, $pairs:ident, $field:ident = $f:expr; $($rest:tt)* ) => {
+        let f = $f;
+        let $builder = $builder.$field(f($pairs.next().unwrap()));
+        construct!(@fields, $builder, $pairs, $($rest)*)
+    };
+    ( $builder:ty : $pair:expr => { $($field:tt)* } ) => {
+        {
+            let builder = <$builder>::builder();
+            let mut pairs = $pair.into_inner();
+            construct!(@fields, builder, pairs, $($field)*);
+            builder.build()
+        }
+    };
+}
+
+lazy_static! {
+    static ref PREC_CLIMBER: PrecClimber<Rule> = PrecClimber::new(vec![
+        Operator::new(Rule::add, Assoc::Left) | Operator::new(Rule::subtract, Assoc::Left),
+        Operator::new(Rule::multiply, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
+    ]);
+}
 
 #[derive(PestParser)]
 #[grammar = "beancount.pest"]
 pub struct BeancountParser;
 
 #[derive(Debug)]
-struct ParseState<'i> {
-    root_names: HashMap<bc::AccountType, &'i str>,
+struct ParseState {
+    root_names: HashMap<bc::AccountType, String>,
+}
+
+fn optional_rule<'i>(rule: Rule, pairs: &mut Pairs<'i, Rule>) -> Option<Pair<'i, Rule>> {
+    match pairs.peek() {
+        Some(ref p) if p.as_rule() == rule => pairs.next(),
+        _ => None,
+    }
 }
 
 pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
@@ -26,11 +70,11 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
 
     let mut state = ParseState {
         root_names: [
-            (bc::AccountType::Assets, "Assets"),
-            (bc::AccountType::Liabilities, "Liabilities"),
-            (bc::AccountType::Equity, "Equity"),
-            (bc::AccountType::Income, "Income"),
-            (bc::AccountType::Expenses, "Expenses"),
+            (bc::AccountType::Assets, "Assets".to_string()),
+            (bc::AccountType::Liabilities, "Liabilities".to_string()),
+            (bc::AccountType::Equity, "Equity".to_string()),
+            (bc::AccountType::Income, "Income".to_string()),
+            (bc::AccountType::Expenses, "Expenses".to_string()),
         ]
         .iter()
         .cloned()
@@ -43,21 +87,29 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
         let dir = directive(directive_pair, &state);
         match dir {
             bc::Directive::Option(ref opt) if opt.name == "name_assets" => {
-                state.root_names.insert(bc::AccountType::Assets, opt.val);
+                state
+                    .root_names
+                    .insert(bc::AccountType::Assets, opt.val.to_string());
             }
             bc::Directive::Option(ref opt) if opt.name == "name_liabilities" => {
                 state
                     .root_names
-                    .insert(bc::AccountType::Liabilities, opt.val);
+                    .insert(bc::AccountType::Liabilities, opt.val.to_string());
             }
             bc::Directive::Option(ref opt) if opt.name == "name_equity" => {
-                state.root_names.insert(bc::AccountType::Equity, opt.val);
+                state
+                    .root_names
+                    .insert(bc::AccountType::Equity, opt.val.to_string());
             }
             bc::Directive::Option(ref opt) if opt.name == "name_income" => {
-                state.root_names.insert(bc::AccountType::Income, opt.val);
+                state
+                    .root_names
+                    .insert(bc::AccountType::Income, opt.val.to_string());
             }
             bc::Directive::Option(ref opt) if opt.name == "name_expenses" => {
-                state.root_names.insert(bc::AccountType::Expenses, opt.val);
+                state
+                    .root_names
+                    .insert(bc::AccountType::Expenses, opt.val.to_string());
             }
             _ => {}
         }
@@ -68,7 +120,7 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
     bc::Ledger::builder().directives(directives).build()
 }
 
-fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
+fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
     match directive.as_rule() {
         Rule::option => option_directive(directive),
         Rule::plugin => plugin_directive(directive),
@@ -88,267 +140,217 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Direc
 }
 
 fn option_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    bc::Directive::Option(
-        bc::BcOption::builder()
-            .name(args.next().map(get_quoted_str).unwrap())
-            .val(args.next().map(get_quoted_str).unwrap())
-            .build(),
-    )
+    bc::Directive::Option(construct! {
+        bc::BcOption: directive => {
+            name = get_quoted_str;
+            val = get_quoted_str;
+        }
+    })
 }
 
 fn plugin_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    bc::Directive::Plugin(
-        bc::Plugin::builder()
-            .module(args.next().map(get_quoted_str).unwrap())
-            .config(args.next().map(get_quoted_str))
-            .build(),
-    )
+    bc::Directive::Plugin(construct! {
+        bc::Plugin: directive => {
+            module = get_quoted_str;
+            config = get_quoted_str;
+        }
+    })
 }
 
 fn custom_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let name = args.next().map(get_quoted_str).unwrap();
-    let custom_args = if args.peek().unwrap().as_rule() == Rule::custom_value_list {
-        args.next()
-            .unwrap()
-            .into_inner()
-            .map(get_quoted_str)
-            .collect()
-    } else {
-        vec![]
-    };
-    let meta = meta_kv(args.next().unwrap());
-    bc::Directive::Custom(
-        bc::Custom::builder()
-            .date(name)
-            .name(date)
-            .args(custom_args)
-            .meta(meta)
-            .build(),
-    )
+    bc::Directive::Custom(construct! {
+        bc::Custom: directive => {
+            date = date;
+            name = get_quoted_str;
+            args = if Rule::custom_value_list {
+                |p: Pair<'i, _>| -> Vec<Cow<'i, str>> {
+                    p.into_inner().map(get_quoted_str).collect()
+                }
+            } else {
+                Vec::new()
+            };
+            meta = meta_kv;
+        }
+    })
 }
 
 fn include_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    bc::Directive::Include(
-        bc::Include::builder()
-            .filename(args.next().map(get_quoted_str).unwrap())
-            .build(),
-    )
+    bc::Directive::Include(construct! {
+        bc::Include: directive => {
+            filename = get_quoted_str;
+        }
+    })
 }
 
-fn open_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let acc = args.next().map(|p| account(p, state)).unwrap();
-    let comm = if args.peek().unwrap().as_rule() == Rule::commodity_list {
-        args.next()
-            .map(|p| p.into_inner().map(|p| p.as_str()).collect::<Vec<_>>())
-            .unwrap()
-    } else {
-        vec![]
-    };
-    let meta = args.next().map(meta_kv).unwrap();
-
-    bc::Directive::Open(
-        bc::Open::builder()
-            .date(date)
-            .account(acc)
-            .constraint_commodities(comm)
-            .meta(meta)
-            .build(),
-    )
+fn open_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    bc::Directive::Open(construct! {
+        bc::Open: directive => {
+            date = date;
+            account = |p| account(p, state);
+            currencies = if Rule::commodity_list {
+                |p: Pair<'i, _>| {
+                    p.into_inner()
+                        .map(|p| p.as_str().into())
+                        .collect::<Vec<_>>()
+                }
+            } else {
+                Vec::new()
+            };
+            meta = meta_kv;
+        }
+    })
 }
 
-fn close_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let acc = args.next().map(|p| account(p, state)).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Close(
-        bc::Close::builder()
-            .date(date)
-            .account(acc)
-            .meta(meta)
-            .build(),
-    )
+fn close_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    bc::Directive::Close(construct! {
+        bc::Close: directive => {
+            date = date;
+            account = |p| account(p, state);
+            meta = meta_kv;
+        }
+    })
 }
 
 fn commodity_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let name = args.next().map(|p| p.as_str()).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Commodity(
-        bc::Commodity::builder()
-            .date(date)
-            .name(name)
-            .meta(meta)
-            .build(),
-    )
+    bc::Directive::Commodity(construct! {
+        bc::Commodity: directive => {
+            date = date;
+            name = as_str;
+            meta = meta_kv;
+        }
+    })
 }
 
-fn note_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let acc = args.next().map(|p| account(p, state)).unwrap();
-    let desc = args.next().map(|p| p.as_str()).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Note(
-        bc::Note::builder()
-            .date(date)
-            .account(acc)
-            .desc(desc)
-            .meta(meta)
-            .build(),
-    )
+fn note_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    bc::Directive::Note(construct! {
+        bc::Note: directive => {
+            date = date;
+            account = |p| account(p, state);
+            comment = as_str;
+            meta = meta_kv;
+        }
+    })
 }
 
-fn pad_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let to_acc = args.next().map(|p| account(p, state)).unwrap();
-    let from_acc = args.next().map(|p| account(p, state)).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Pad(
-        bc::Pad::builder()
-            .date(date)
-            .pad_to_account(to_acc)
-            .pad_from_account(from_acc)
-            .meta(meta)
-            .build(),
-    )
+fn pad_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    bc::Directive::Pad(construct! {
+        bc::Pad: directive => {
+            date = date;
+            pad_to_account = |p| account(p, state);
+            pad_from_account = |p| account(p, state);
+            meta = meta_kv;
+        }
+    })
 }
 
 fn query_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let name = args.next().map(get_quoted_str).unwrap();
-    let query = args.next().map(get_quoted_str).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Query(
-        bc::Query::builder()
-            .date(date)
-            .name(name)
-            .query(query)
-            .meta(meta)
-            .build(),
-    )
+    bc::Directive::Query(construct! {
+        bc::Query: directive => {
+            date = date;
+            name = get_quoted_str;
+            query_string = get_quoted_str;
+            meta = meta_kv;
+        }
+    })
 }
 
 fn event_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let name = args.next().map(get_quoted_str).unwrap();
-    let val = args.next().map(get_quoted_str).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Event(
-        bc::Event::builder()
-            .date(date)
-            .name(name)
-            .val(val)
-            .meta(meta)
-            .build(),
-    )
+    bc::Directive::Event(construct! {
+        bc::Event: directive => {
+            date = date;
+            name = get_quoted_str;
+            description = get_quoted_str;
+            meta = meta_kv;
+        }
+    })
 }
 
-fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let account = args.next().map(|p| account(p, state)).unwrap();
-    let path = args.next().map(get_quoted_str).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Document(
-        bc::Document::builder()
-            .date(date)
-            .account(account)
-            .path(path)
-            .meta(meta)
-            .build(),
-    )
+fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    bc::Directive::Document(construct! {
+        bc::Document: directive => {
+            date = date;
+            account = |p| account(p, state);
+            path = get_quoted_str;
+            tags = |_| HashSet::new();
+            links = |_| HashSet::new();
+            meta = meta_kv;
+        }
+    })
 }
 
 fn price_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
-    let mut args = directive.into_inner();
-    let date = args.next().map(|p| p.as_str()).unwrap();
-    let commodity = args.next().map(|p| p.as_str()).unwrap();
-    let amount = args.next().map(amount).unwrap();
-    let meta = args.next().map(meta_kv).unwrap();
-    bc::Directive::Price(
-        bc::Price::builder()
-            .date(date)
-            .currency(commodity)
-            .amount(amount)
-            .meta(meta)
-            .build(),
-    )
+    bc::Directive::Price(construct! {
+        bc::Price: directive => {
+            date = date;
+            currency = as_str;
+            amount = amount;
+            meta = meta_kv;
+        }
+    })
 }
 
 fn num_expr<'i>(pair: Pair<'i, Rule>) -> Decimal {
     debug_assert!(pair.as_rule() == Rule::num_expr);
-    use pest::prec_climber::{Assoc, Operator, PrecClimber};
-    let climber = PrecClimber::new(vec![
-        Operator::new(Rule::add, Assoc::Left) | Operator::new(Rule::subtract, Assoc::Left),
-        Operator::new(Rule::multiply, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
-    ]);
-    let primary = |pair: Pair<'i, Rule>| {
-        dbg!(pair.as_rule());
-        debug_assert!(pair.as_rule() == Rule::term);
-        let mut term_parts = pair.into_inner();
-        let (prefix, pair) = if term_parts.peek().unwrap().as_rule() == Rule::num_prefix {
-            (
-                term_parts.next().map(|p| p.as_str()),
-                term_parts.next().unwrap(),
-            )
-        } else {
-            (None, term_parts.next().unwrap())
-        };
+    PREC_CLIMBER.climb(pair.into_inner(), term, reduce_num_expr)
+}
 
-        let mut num_expr = match pair.as_rule() {
-            Rule::num => Decimal::from_str(pair.as_str()).unwrap(),
-            Rule::num_expr => num_expr(pair),
-            _ => unimplemented!(),
-        };
-        if let Some("-") = prefix {
-            num_expr.set_sign(!num_expr.is_sign_positive());
-        }
-        num_expr
+fn term<'i>(pair: Pair<'i, Rule>) -> Decimal {
+    debug_assert!(pair.as_rule() == Rule::term);
+    let mut term_parts = pair.into_inner();
+    let prefix = optional_rule(Rule::num_prefix, &mut term_parts).map(|p| p.as_str());
+    let pair = term_parts.next().unwrap();
+    let mut num_expr = match pair.as_rule() {
+        Rule::num => Decimal::from_str(pair.as_str()).unwrap(),
+        Rule::num_expr => num_expr(pair),
+        _ => unimplemented!(),
     };
-    let infix = |lhs, op: Pair<'i, Rule>, rhs| match op.as_rule() {
+    if let Some("-") = prefix {
+        num_expr.set_sign(!num_expr.is_sign_positive());
+    }
+    num_expr
+}
+
+fn reduce_num_expr<'i>(lhs: Decimal, op: Pair<'i, Rule>, rhs: Decimal) -> Decimal {
+    match op.as_rule() {
         Rule::add => lhs + rhs,
         Rule::subtract => lhs - rhs,
         Rule::multiply => lhs * rhs,
         Rule::divide => lhs / rhs,
         _ => unimplemented!(),
-    };
-    climber.climb(pair.into_inner(), primary, infix)
+    }
 }
 
 fn amount<'i>(pair: Pair<'i, Rule>) -> bc::Amount<'i> {
     debug_assert!(pair.as_rule() == Rule::amount);
-    let mut inner = pair.into_inner();
-    bc::Amount::builder()
-        .num(Some(num_expr(inner.next().unwrap())))
-        .commodity(inner.next().map(|p| p.as_str()).unwrap())
-        .build()
+    construct! {
+        bc::Amount: pair => {
+            num = |p| Some(num_expr(p));
+            commodity = as_str;
+        }
+    }
 }
 
-fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState<'i>) -> bc::Account<'i> {
+fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Account<'i> {
     debug_assert!(pair.as_rule() == Rule::account);
     let mut inner = pair.into_inner();
     let first = inner.next().unwrap().as_str();
     let account_type = state
         .root_names
         .iter()
-        .filter(|(_, &v)| v == first)
+        .filter(|(_, ref v)| *v == first)
         .map(|(k, _)| k.clone())
         .next()
         .expect("invalid root account");
     let parts: Vec<_> = inner.map(|p| &p.as_str()[1..]).collect();
     bc::Account::builder().ty(account_type).parts(parts).build()
+}
+
+fn as_str<'i>(pair: Pair<'i, Rule>) -> &'i str {
+    pair.as_str()
+}
+
+fn date<'i>(pair: Pair<'i, Rule>) -> &'i str {
+    pair.as_str()
 }
 
 fn meta_kv<'i>(pair: Pair<'i, Rule>) -> HashMap<&'i str, &'i str> {
@@ -363,9 +365,9 @@ fn meta_kv<'i>(pair: Pair<'i, Rule>) -> HashMap<&'i str, &'i str> {
         .collect()
 }
 
-fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> &'i str {
+fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> Cow<'i, str> {
     debug_assert!(pair.as_rule() == Rule::quoted_str);
-    pair.into_inner().next().unwrap().as_str()
+    pair.into_inner().next().unwrap().as_str().into()
 }
 
 #[cfg(test)]
