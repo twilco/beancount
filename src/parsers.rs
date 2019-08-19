@@ -312,10 +312,18 @@ fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> b
         bc::Transaction: directive => {
             date = date;
             flag = flag;
-            inner {
-                payee ?= get_quoted_str;
-                narration ?= get_quoted_str;
-            }
+            let (payee, narration) = from pair {
+                let mut inner = pair.into_inner();
+                let first = inner.next().map(get_quoted_str).unwrap();
+                let second = inner.next().map(get_quoted_str);
+                if let Some(second) = second {
+                    (Some(first), second)
+                } else {
+                    (None, first)
+                }
+            };
+            payee := payee;
+            narration := narration;
             let (meta, postings) = from pair {
                 let mut postings: Vec<bc::Posting<'i>> = Vec::new();
                 let mut tx_meta = bc::Meta::new();

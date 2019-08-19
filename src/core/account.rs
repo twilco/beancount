@@ -22,8 +22,8 @@ use super::account_types::AccountType;
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Account<'a> {
     /// Type of the account.
-    ty: AccountType,
+    pub ty: AccountType,
 
     /// Optional parts of the account following the account type.
-    parts: Vec<&'a str>,
+    pub parts: Vec<&'a str>,
 }

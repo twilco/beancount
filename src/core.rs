@@ -20,7 +20,7 @@ pub mod position;
 /// Represents the complete ledger consisting of a number of directives.
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
 pub struct Ledger<'a> {
-    directives: Vec<Directive<'a>>,
+    pub directives: Vec<Directive<'a>>,
 }
 
 pub type Date<'a> = &'a str;
