@@ -637,6 +637,7 @@ pub struct Transaction<'a> {
     ///
     /// `*` or `txn`: Completed transaction, known amounts, “this looks correct.”
     /// `!`: Incomplete transaction, needs confirmation or revision, “this looks incorrect.”
+    #[builder(default=Flag::Okay)]
     pub flag: Flag,
 
     /// Payee of this transaction.

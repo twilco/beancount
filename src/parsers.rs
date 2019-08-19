@@ -578,6 +578,7 @@ fn compound_amount<'i>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core as bc;
     use indoc::indoc;
     use pest::Parser;
 
@@ -900,6 +901,50 @@ mod tests {
         "
             )
         );
+
+        assert_eq!(
+            parse(indoc!(
+                "
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+                Liabilities:CreditCard:CapitalOne         10 USD { 15 GBP } @ 20 GBP
+            "
+            )),
+            bc::Ledger {
+                directives: vec![bc::Directive::Transaction(
+                    bc::Transaction::builder()
+                        .date("2014-05-05")
+                        .payee(Some("Cafe Mogador".into()))
+                        .narration("Lamb tagine with wine")
+                        .postings(Some(vec![bc::Posting::builder()
+                            .account(
+                                bc::Account::builder()
+                                    .ty(bc::AccountType::Liabilities)
+                                    .parts(vec!["CreditCard", "CapitalOne"])
+                                    .build()
+                            )
+                            .units(
+                                bc::IncompleteAmount::builder()
+                                    .num(Some(10.into()))
+                                    .commodity(Some("USD".into()))
+                                    .build()
+                            )
+                            .cost(
+                                bc::CostSpec::builder()
+                                    .number_per(Some(15.into()))
+                                    .currency(Some("GBP".into()))
+                                    .build()
+                            )
+                            .price(Some(
+                                bc::IncompleteAmount::builder()
+                                    .num(Some(20.into()))
+                                    .commodity(Some("GBP".into()))
+                                    .build()
+                            ))
+                            .build()]))
+                        .build()
+                )]
+            }
+        )
     }
 
 }
