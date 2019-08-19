@@ -103,6 +103,9 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
     let mut directives = Vec::new();
 
     for directive_pair in parsed.into_inner() {
+        if directive_pair.as_rule() == Rule::EOI {
+            break;
+        }
         let dir = directive(directive_pair, &state);
         match dir {
             bc::Directive::Option(ref opt) if opt.name == "name_assets" => {
@@ -155,7 +158,10 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive
         Rule::document => document_directive(directive, state),
         Rule::price => price_directive(directive),
         Rule::transaction => transaction_directive(directive, state),
-        _ => bc::Directive::Unsupported,
+        r => {
+            dbg!(r);
+            bc::Directive::Unsupported
+        }
     }
 }
 
