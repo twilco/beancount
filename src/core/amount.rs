@@ -1,7 +1,7 @@
-use std::borrow::Cow;
-
 use rust_decimal::Decimal;
 use typed_builder::TypedBuilder;
+
+use super::Currency;
 
 /// A number of units of a certain commodity.
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
@@ -10,7 +10,7 @@ pub struct Amount<'a> {
     pub num: Decimal,
 
     /// The commodity of the amount.
-    pub commodity: Cow<'a, str>,
+    pub currency: Currency<'a>,
 }
 
 /// An amount that may have missing units and/or commidity.
@@ -22,5 +22,5 @@ pub struct IncompleteAmount<'a> {
 
     /// The commodity of the amount.
     #[builder(default)]
-    pub commodity: Option<Cow<'a, str>>,
+    pub currency: Option<Currency<'a>>,
 }

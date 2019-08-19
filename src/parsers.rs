@@ -372,7 +372,7 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Posting<'i> {
                 true,
                 bc::IncompleteAmount {
                     num: Some(n),
-                    commodity,
+                    currency,
                 },
             )),
             Some(n_units),
@@ -385,7 +385,7 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Posting<'i> {
             Some(
                 bc::IncompleteAmount::builder()
                     .num(Some(num))
-                    .commodity(commodity)
+                    .currency(currency)
                     .build(),
             )
         }
@@ -438,7 +438,7 @@ fn amount<'i>(pair: Pair<'i, Rule>) -> bc::Amount<'i> {
     construct! {
         bc::Amount: pair => {
             num = num_expr;
-            commodity = as_str;
+            currency = as_str;
         }
     }
 }
@@ -452,7 +452,7 @@ fn incomplete_amount<'i>(pair: Pair<'i, Rule>) -> bc::IncompleteAmount<'i> {
             } else {
                 None
             };
-            commodity = if Rule::commodity {
+            currency = if Rule::commodity {
                 |p| Some(as_str(p).into())
             } else {
                 None
@@ -925,7 +925,7 @@ mod tests {
                             .units(
                                 bc::IncompleteAmount::builder()
                                     .num(Some(10.into()))
-                                    .commodity(Some("USD".into()))
+                                    .currency(Some("USD".into()))
                                     .build()
                             )
                             .cost(
@@ -937,7 +937,7 @@ mod tests {
                             .price(Some(
                                 bc::IncompleteAmount::builder()
                                     .num(Some(20.into()))
-                                    .commodity(Some("GBP".into()))
+                                    .currency(Some("GBP".into()))
                                     .build()
                             ))
                             .build()]))
