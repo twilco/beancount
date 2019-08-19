@@ -4,12 +4,13 @@ use rust_decimal::Decimal;
 use typed_builder::TypedBuilder;
 
 use super::amount::Amount;
+use super::{Currency, Date};
 
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Cost<'a> {
     pub number: Decimal,
-    pub currency: Cow<'a, str>,
-    pub date: Cow<'a, str>,
+    pub currency: Currency<'a>,
+    pub date: Date<'a>,
     pub label: Option<Cow<'a, str>>,
 }
 
@@ -28,10 +29,10 @@ pub struct CostSpec<'a> {
     pub number_total: Option<Decimal>,
     /// The type of commodity for this cost.
     #[builder(default)]
-    pub currency: Option<Cow<'a, str>>,
+    pub currency: Option<Currency<'a>>,
     /// The date of the at-cost.
     #[builder(default)]
-    pub date: Option<Cow<'a, str>>,
+    pub date: Option<Date<'a>>,
     /// The label of the cost.
     #[builder(default)]
     pub label: Option<Cow<'a, str>>,

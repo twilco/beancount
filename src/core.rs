@@ -23,7 +23,7 @@ pub struct Ledger<'a> {
     pub directives: Vec<Directive<'a>>,
 }
 
-pub type Date<'a> = &'a str;
+pub type Date<'a> = Cow<'a, str>;
 pub type Meta<'a> = HashMap<&'a str, &'a str>;
 pub type Currency<'a> = Cow<'a, str>;
 

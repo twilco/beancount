@@ -1,5 +1,7 @@
 use typed_builder::TypedBuilder;
 
+use std::borrow::Cow;
+
 use super::account_types::AccountType;
 
 /// Represents an account.
@@ -25,5 +27,5 @@ pub struct Account<'a> {
     pub ty: AccountType,
 
     /// Optional parts of the account following the account type.
-    pub parts: Vec<&'a str>,
+    pub parts: Vec<Cow<'a, str>>,
 }

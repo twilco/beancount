@@ -512,7 +512,7 @@ fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Account<'i> {
         .map(|(k, _)| k.clone())
         .next()
         .expect("invalid root account");
-    let parts: Vec<_> = inner.map(|p| &p.as_str()[1..]).collect();
+    let parts: Vec<_> = inner.map(|p| Cow::Borrowed(&p.as_str()[1..])).collect();
     bc::Account::builder().ty(account_type).parts(parts).build()
 }
 
@@ -919,7 +919,7 @@ mod tests {
                             .account(
                                 bc::Account::builder()
                                     .ty(bc::AccountType::Liabilities)
-                                    .parts(vec!["CreditCard", "CapitalOne"])
+                                    .parts(vec!["CreditCard".into(), "CapitalOne".into()])
                                     .build()
                             )
                             .units(
