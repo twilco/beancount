@@ -657,7 +657,7 @@ pub struct Transaction<'a> {
 
     /// Postings belonging to this transaction.
     #[builder(default)]
-    pub postings: Option<Vec<Posting<'a>>>,
+    pub postings: Vec<Posting<'a>>,
 
     /// Metadata attached to the transaction.
     #[builder(default)]

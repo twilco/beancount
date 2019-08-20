@@ -351,7 +351,7 @@ fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> b
                 }
                 (tx_meta, postings)
             };
-            postings := Some(postings);
+            postings := postings;
             meta := meta;
         }
     })
@@ -915,7 +915,7 @@ mod tests {
                         .date("2014-05-05")
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine")
-                        .postings(Some(vec![bc::Posting::builder()
+                        .postings(vec![bc::Posting::builder()
                             .account(
                                 bc::Account::builder()
                                     .ty(bc::AccountType::Liabilities)
@@ -940,7 +940,7 @@ mod tests {
                                     .currency(Some("GBP".into()))
                                     .build()
                             ))
-                            .build()]))
+                            .build()])
                         .build()
                 )]
             }
