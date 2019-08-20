@@ -6,21 +6,21 @@ use super::Currency;
 /// A number of units of a certain commodity.
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Amount<'a> {
-    /// The (optional) value of the amount.
+    /// The value of the amount.
     pub num: Decimal,
 
     /// The commodity of the amount.
     pub currency: Currency<'a>,
 }
 
-/// An amount that may have missing units and/or commidity.
+/// An amount that may have missing units and/or commodity.
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct IncompleteAmount<'a> {
     /// The (optional) value of the amount.
     #[builder(default)]
     pub num: Option<Decimal>,
 
-    /// The commodity of the amount.
+    /// The (optional) commodity of the amount.
     #[builder(default)]
     pub currency: Option<Currency<'a>>,
 }
