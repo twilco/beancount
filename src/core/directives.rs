@@ -10,6 +10,25 @@ use super::flags::Flag;
 use super::posting::Posting;
 use super::{Currency, Date, Link, Meta, Tag};
 
+/// The set of booking methods for positions on accounts.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Booking {
+    /// Reject ambiguous matches with an error.
+    Strict,
+
+    /// Disable matching and accept the creation of mixed inventories.
+    None,
+
+    /// Average cost booking: merge all matching lots before and after.
+    Average,
+
+    /// First-in first-out in the case of ambiguity.
+    Fifo,
+
+    /// Last-in first-out in the case of ambiguity.
+    Lifo,
+}
+
 /// Enum of all directive types.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Directive<'a> {
@@ -29,25 +48,6 @@ pub enum Directive<'a> {
     Query(Query<'a>),
     Transaction(Transaction<'a>),
     Unsupported,
-}
-
-/// Represents a numeric expression.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum NumExpr<'a> {
-    /// A number
-    Num(&'a str),
-    /// Unary positive operator `+a`
-    Pos(Box<NumExpr<'a>>),
-    /// Unary negative operator `-a`
-    Neg(Box<NumExpr<'a>>),
-    /// Addition `a + b`
-    Add(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
-    /// Subtraction operator `a - b`
-    Subtract(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
-    /// Multiply operator `a * b`
-    Multiply(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
-    /// Division operator `a / b`
-    Divide(Box<NumExpr<'a>>, Box<NumExpr<'a>>),
 }
 
 /// Represents a `balance` directive, which is a way for you to input your statement balance into
@@ -351,15 +351,6 @@ pub struct Note<'a> {
     pub meta: Meta<'a>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Booking {
-    Strict,
-    None,
-    Average,
-    Fifo,
-    Lifo,
-}
-
 /// Represents a `open` directive.  This directive signifies the opening of an account.
 ///
 /// Some examples of the `open` directive:
@@ -382,11 +373,13 @@ pub struct Open<'a> {
     /// Account being opened.
     pub account: Account<'a>,
 
-    /// Commodities allowed for the opened account.
+    /// Commodities allowed for the opened account. An empty list means no restrictions on the
+    /// allowed commodities.
     #[builder(default)]
     pub currencies: Vec<Currency<'a>>,
 
-    /// Booking method
+    /// Booking method. The default booking method for accounts is
+    /// [`Booking::Strict`](enum.Booking.html).
     #[builder(default=Booking::Strict)]
     pub booking: Booking,
 
