@@ -81,7 +81,6 @@ fn optional_rule<'i>(rule: Rule, pairs: &mut Pairs<'i, Rule>) -> Option<Pair<'i,
 }
 
 pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
-    let now = std::time::Instant::now();
     let parsed = BeancountParser::parse(Rule::file, &input)
         .expect("successful parse")
         .next()
@@ -137,7 +136,6 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
         }
         directives.push(dir);
     }
-    println!("Parsing time: {:?}", now.elapsed());
 
     bc::Ledger::builder().directives(directives).build()
 }
@@ -158,10 +156,7 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive
         Rule::document => document_directive(directive, state),
         Rule::price => price_directive(directive),
         Rule::transaction => transaction_directive(directive, state),
-        r => {
-            dbg!(r);
-            bc::Directive::Unsupported
-        }
+        _ => bc::Directive::Unsupported,
     }
 }
 
