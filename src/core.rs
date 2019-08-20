@@ -9,6 +9,7 @@ pub use amount::{Amount, IncompleteAmount};
 pub use directives::*;
 pub use flags::Flag;
 pub use position::CostSpec;
+pub use posting::Posting;
 
 pub mod account;
 pub mod account_types;
@@ -16,6 +17,7 @@ pub mod amount;
 pub mod directives;
 pub mod flags;
 pub mod position;
+pub mod posting;
 
 /// Represents the complete ledger consisting of a number of directives.
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
