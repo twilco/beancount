@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 use lazy_static::lazy_static;
@@ -325,11 +325,16 @@ fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> b
             };
             payee := payee;
             narration := narration;
-            let (meta, postings) = from pair {
+            let (meta, tags, links, postings) = from pair {
                 let mut postings: Vec<bc::Posting<'i>> = Vec::new();
                 let mut tx_meta = bc::Meta::new();
+                let mut tx_tags = HashSet::new();
+                let mut tx_links = HashSet::new();
                 for p in pair.into_inner() {
                     match p.as_rule() {
+                        Rule::posting => {
+                            postings.push(posting(p, state));
+                        }
                         Rule::key_value => {
                             let (k, v) = meta_kv_pair(p);
                             if let Some(last) = postings.last_mut() {
@@ -338,16 +343,25 @@ fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> b
                                 tx_meta.insert(k, v);
                             }
                         }
-                        Rule::posting => {
-                            postings.push(posting(p, state));
+                        Rule::tag => {
+                            let tag = (&p.as_str()[1..]).into();
+                            tx_tags.insert(tag);
                         }
-                        _ => unimplemented!()
+                        Rule::link => {
+                            let link = (&p.as_str()[1..]).into();
+                            tx_links.insert(link);
+                        }
+                        rule => {
+                            unimplemented!("rule {:?}", rule);
+                        }
                     }
                 }
-                (tx_meta, postings)
+                (tx_meta, tx_tags, tx_links, postings)
             };
             postings := postings;
             meta := meta;
+            tags := tags;
+            links := links;
         }
     })
 }
