@@ -408,7 +408,10 @@ fn term<'i>(pair: Pair<'i, Rule>) -> Decimal {
     let prefix = optional_rule(Rule::num_prefix, &mut term_parts).map(|p| p.as_str());
     let pair = term_parts.next().unwrap();
     let mut num_expr = match pair.as_rule() {
-        Rule::num => Decimal::from_str(pair.as_str()).unwrap(),
+        Rule::num => {
+            let s = pair.as_str().replace(',', "");
+            Decimal::from_str(&s).unwrap()
+        }
         Rule::num_expr => num_expr(pair),
         _ => unimplemented!(),
     };
