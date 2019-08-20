@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use rust_decimal::Decimal;
 use typed_builder::TypedBuilder;
 
@@ -23,4 +25,18 @@ pub struct IncompleteAmount<'a> {
     /// The (optional) commodity of the amount.
     #[builder(default)]
     pub currency: Option<Currency<'a>>,
+}
+
+impl<'a> TryFrom<IncompleteAmount<'a>> for Amount<'a> {
+    type Error = ();
+
+    fn try_from(val: IncompleteAmount<'a>) -> Result<Self, Self::Error> {
+        match val {
+            IncompleteAmount {
+                num: Some(num),
+                currency: Some(currency),
+            } => Ok(Amount { num, currency }),
+            _ => Err(()),
+        }
+    }
 }
