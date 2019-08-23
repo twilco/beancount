@@ -161,24 +161,29 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive
 }
 
 fn option_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Option(construct! {
         bc::BcOption: directive => {
             name = get_quoted_str;
             val = get_quoted_str;
+            source := Some(source);
         }
     })
 }
 
 fn plugin_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Plugin(construct! {
         bc::Plugin: directive => {
             module = get_quoted_str;
             config = get_quoted_str;
+            source := Some(source);
         }
     })
 }
 
 fn custom_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Custom(construct! {
         bc::Custom: directive => {
             date = date;
@@ -191,19 +196,23 @@ fn custom_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
                 Vec::new()
             };
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn include_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Include(construct! {
         bc::Include: directive => {
             filename = get_quoted_str;
+            source := Some(source);
         }
     })
 }
 
 fn open_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Open(construct! {
         bc::Open: directive => {
             date = date;
@@ -218,97 +227,115 @@ fn open_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Dire
                 Vec::new()
             };
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn close_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Close(construct! {
         bc::Close: directive => {
             date = date;
             account = |p| account(p, state);
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn commodity_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Commodity(construct! {
         bc::Commodity: directive => {
             date = date;
             name = as_str;
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn note_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Note(construct! {
         bc::Note: directive => {
             date = date;
             account = |p| account(p, state);
             comment = as_str;
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn pad_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Pad(construct! {
         bc::Pad: directive => {
             date = date;
             pad_to_account = |p| account(p, state);
             pad_from_account = |p| account(p, state);
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn query_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Query(construct! {
         bc::Query: directive => {
             date = date;
             name = get_quoted_str;
             query_string = get_quoted_str;
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn event_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Event(construct! {
         bc::Event: directive => {
             date = date;
             name = get_quoted_str;
             description = get_quoted_str;
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Document(construct! {
         bc::Document: directive => {
             date = date;
             account = |p| account(p, state);
             path = get_quoted_str;
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn price_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Price(construct! {
         bc::Price: directive => {
             date = date;
             currency = as_str;
             amount = amount;
             meta = meta_kv;
+            source := Some(source);
         }
     })
 }
 
 fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+    let source = directive.as_str();
     bc::Directive::Transaction(construct! {
         bc::Transaction: directive => {
             date = date;
@@ -362,6 +389,7 @@ fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> b
             meta := meta;
             tags := tags;
             links := links;
+            source := Some(source);
         }
     })
 }

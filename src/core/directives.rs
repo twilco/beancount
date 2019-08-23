@@ -90,6 +90,10 @@ pub struct Balance<'a> {
     /// Metadata attached to the balance directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a Beancount `option`, which are configuration points global to the file.
@@ -115,6 +119,10 @@ pub struct BcOption<'a> {
 
     /// Value of the option.
     pub val: Cow<'a, str>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `close` directive.  This directive signifies the closing of an account.
@@ -144,6 +152,10 @@ pub struct Close<'a> {
     /// Metadata attached to the close directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `commodity` directive.  This directive allows you to declare commodities,
@@ -182,6 +194,10 @@ pub struct Commodity<'a> {
     /// Metadata attached to the commodity directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `custom` directive, which is a generic directive provided to allow clients to
@@ -223,6 +239,10 @@ pub struct Custom<'a> {
     /// Metadata attached to the custom directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `document` directive.  A `document` directive can be used to attach an external
@@ -263,6 +283,10 @@ pub struct Document<'a> {
     /// Metadata attached to the document directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents an `event` directive.  `event` directives are used to track the value of some
@@ -295,6 +319,10 @@ pub struct Event<'a> {
     /// Metadata attached to the event directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents an `include` directive.  The `include` directive, as it sounds, includes another
@@ -317,6 +345,10 @@ pub struct Event<'a> {
 pub struct Include<'a> {
     /// Fully qualified filename, including any necessary path segments.
     pub filename: Cow<'a, str>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `note` directive.  A `note` directive is simply used to attach a dated comment to
@@ -349,6 +381,10 @@ pub struct Note<'a> {
     /// Metadata attached to the note directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `open` directive.  This directive signifies the opening of an account.
@@ -386,6 +422,10 @@ pub struct Open<'a> {
     /// Metadata attached to the open directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `pad` directive.  A `pad` directive automatically inserts a transaction that will
@@ -422,6 +462,10 @@ pub struct Pad<'a> {
     /// Metadata attached to the pad directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `plugin` directive.
@@ -452,6 +496,10 @@ pub struct Plugin<'a> {
     /// Configuration data to be passed to the plugin.
     #[builder(default)]
     pub config: Option<Cow<'a, str>>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `price` directive, which establishes the rate of exchange between one commodity and
@@ -495,6 +543,10 @@ pub struct Price<'a> {
     /// Metadata attached to the price directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `query` directive.  `query` directives allow you to insert a query in the usual
@@ -531,6 +583,10 @@ pub struct Query<'a> {
     /// Metadata attached to the query directive.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    /// Source string from the parsed input
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
 
 /// Represents a `txn` (or `*` or `!`) directive.
@@ -611,4 +667,7 @@ pub struct Transaction<'a> {
     /// Metadata attached to the transaction.
     #[builder(default)]
     pub meta: Meta<'a>,
+
+    #[builder(default)]
+    pub source: Option<&'a str>,
 }
