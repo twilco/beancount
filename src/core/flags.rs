@@ -4,3 +4,9 @@ pub enum Flag {
     Warning,
     Other(String),
 }
+
+impl Default for Flag {
+    fn default() -> Self {
+        Flag::Okay
+    }
+}
