@@ -942,13 +942,14 @@ mod tests {
             )
         );
 
-        assert_eq!(
-            parse(indoc!(
-                "
+        let source = indoc!(
+            "
             2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
                 Liabilities:CreditCard:CapitalOne         10 USD { 15 GBP } @ 20 GBP
             "
-            )),
+        );
+        assert_eq!(
+            parse(&source),
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
@@ -981,6 +982,7 @@ mod tests {
                                     .build()
                             ))
                             .build()])
+                        .source(source)
                         .build()
                 )]
             }
