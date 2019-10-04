@@ -1,6 +1,6 @@
 [package]
 name = "beancount"
-description = "Rust tooling surrounding Beancount, a a double-entry bookkeeping language."
+description = "Rust tooling surrounding Beancount, a double-entry bookkeeping language."
 version = "0.1.0"
 authors = ["Tyler Wilcock <tyler.l.wilcock@gmail.com>", "Michael Budde <mbudde@gmail.com>"]
 repository = "https://github.com/twilco/beancount"
@@ -13,6 +13,6 @@ travis-ci = { repository = "twilco/beancount", branch = "master" }
 
 [dependencies]
 typed-builder = "0.3"
-pest = "2.1.1"
+pest = "2.1.2"
 pest_derive = "2.1.0"
 indoc = "0.3"
