@@ -20,7 +20,7 @@ date = ${ year ~ date_separator ~ month ~ date_separator ~ day }
 
 //// Number primitives
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
-    int = @{ ("+" | "-")? ~ ( ASCII_DIGIT{4,} | separated_int ) }
+    int = @{ ASCII_DIGIT{4,} | separated_int }
     separated_int = @{ ASCII_DIGIT{1,3} ~ ( "," ~ ASCII_DIGIT{3} )* }
 operation = _{ add | subtract | multiply | divide }
     add      = @{ "+" }
@@ -28,24 +28,25 @@ operation = _{ add | subtract | multiply | divide }
     multiply = @{ "*" }
     divide   = @{ "/" }
 num_expr = { term ~ (operation ~ term)* }
-term = _{ num | "(" ~ num_expr ~ ")" }
+num_prefix = @{ "+" | "-" }
+term = { num_prefix? ~ ( num | "(" ~ num_expr ~ ")" ) }
 amount = { num_expr ~ commodity }
 
 //// String primitives
-double_quote = @{ "\"" }
-quoted_str = @{ double_quote ~ inner_quoted_str ~ double_quote }
+double_quote = _{ "\"" }
+quoted_str = ${ double_quote ~ inner_quoted_str ~ double_quote }
 inner_quoted_str = @{ quoted_char* }
 quoted_char = @{ escape_sequence | ( !"\"" ~ ANY ) }
 escape_sequence = @{ "\\" ~ ANY }
 valid_non_letter_commodity_char = @{ "'" |  "_" | "-" | "." }
 commodity_trailing = @{ valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
 commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
-commodity_list = @{ commodity ~ ("," ~ commodity)* }
+commodity_list = ${ commodity ~ ("," ~ commodity)* }
 
 //// Account primitives
 account_type = @{ UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
 account_name_piece = @{ ":" ~ (UPPERCASE_LETTER | DECIMAL_NUMBER) ~ (LETTER | DECIMAL_NUMBER | "-")* }
-account = @{ account_type ~ account_name_piece+ }
+account = ${ account_type ~ account_name_piece+ }
 tag_name = @{ ( ASCII_ALPHANUMERIC | "-" | "_" | "/" | "." )+ }
 link = ${ "^" ~ tag_name }
 tag = ${ "#" ~ tag_name }
@@ -71,9 +72,8 @@ custom_value = _{ quoted_str | date | bool | amount | num_expr | account }
 custom_value_list = { custom_value+ }
 custom = { date ~ "custom" ~ quoted_str ~ custom_value_list? ~ eol_kv_list }
 
-filename = { quoted_str }
 // 2013-11-03 document Liabilities:CreditCard "/home/joe/stmts/apr-2014.pdf"
-document = { date ~ "document" ~ account ~ filename ~ tags_links? ~ eol_kv_list }
+document = { date ~ "document" ~ account ~ quoted_str ~ tags_links? ~ eol_kv_list }
 
 // 2014-07-09 event "location" "Paris, France"
 event = { date ~ "event" ~ quoted_str ~ quoted_str ~ eol_kv_list }
@@ -136,22 +136,22 @@ flag_forecasted = @{ "#" }
 txn_strings = { quoted_str ~ quoted_str? }
 posting = !{
     //   ! Assets:BofA:Checking 1234.32 USD {{502.12 # 9.95 USD, 2018-01-01}} @@ 173.12 US
-    (account | txn_flag ~ account) ~ ( incomplete_amount ~ cost_spec? ~ (("@@" | "@") ~ price_annotation)? )?
+    (account | txn_flag ~ account) ~ ( incomplete_amount ~ cost_spec? ~ price_annotation? )?
 }
-posting_or_kv_list = !{ key_value | posting | tags_links | COMMENT }
+posting_or_kv_list = _{ key_value | posting | tags_links | COMMENT }
 indented_posting_or_kv_list = _{ indent ~ posting_or_kv_list ~ eol }
 eol_posting_or_kv_list = ${ eol ~ indented_posting_or_kv_list* }
-price_annotation = { incomplete_amount }
+price_annotation = { price_annotation_unit | price_annotation_total }
+price_annotation_unit = { "@" ~ incomplete_amount }
+price_annotation_total = { "@@" ~ incomplete_amount }
 // 189.10 USD | USD | 152.41
 incomplete_amount = { (num_expr ~ commodity) | commodity | num_expr }
 // {{502.12 # 9.95 USD, 2018-01-01}}
-cost_spec = {
-	("{" ~ cost_comp_list ~ "}")
-    |
-    ("{{" ~ cost_comp_list ~ "}}")
-}
+cost_spec = { cost_spec_unit | cost_spec_total }
+cost_spec_unit = { "{" ~ cost_comp_list ~ "}" }
+cost_spec_total = { "{{" ~ cost_comp_list ~ "}}" }
 // 502.12 # 9.95 USD, 2018-01-01, "hello there"
-cost_comp_list = { cost_comp ~ ("," ~ cost_comp)* }
+cost_comp_list = _{ cost_comp ~ ("," ~ cost_comp)* }
 // TODO: Need to handle the asterisk case here.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-669
 cost_comp = _{ date | quoted_str | compound_amount }
 compound_amount = {
