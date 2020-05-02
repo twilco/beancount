@@ -618,7 +618,7 @@ fn compound_amount<'i>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core as bc;
+    use crate::bc;
     use indoc::indoc;
     use pest::Parser;
 
