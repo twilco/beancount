@@ -1,4 +1,4 @@
-use beancount::parsers::parse;
+use beancount_parser::parse;
 
 fn main() {
     let filename = std::env::args().nth(1).expect("filename argument");

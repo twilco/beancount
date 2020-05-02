@@ -10,7 +10,7 @@ use pest_derive::Parser as PestParser;
 use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 
-use crate::core as bc;
+use beancount_core as bc;
 
 macro_rules! construct {
     ( @fields, $builder:ident, $pairs:ident, ) => {};
