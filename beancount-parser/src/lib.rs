@@ -458,7 +458,7 @@ fn term<'i>(pair: Pair<'i, Rule>) -> Decimal {
         _ => unimplemented!(),
     };
     if let Some("-") = prefix {
-        num_expr.set_sign(!num_expr.is_sign_positive());
+        num_expr.set_sign_positive(!num_expr.is_sign_positive());
     }
     num_expr
 }
