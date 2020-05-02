@@ -458,7 +458,7 @@ fn term<'i>(pair: Pair<'i, Rule>) -> Decimal {
         _ => unimplemented!(),
     };
     if let Some("-") = prefix {
-        num_expr.set_sign(!num_expr.is_sign_positive());
+        num_expr.set_sign_positive(!num_expr.is_sign_positive());
     }
     num_expr
 }
@@ -618,7 +618,7 @@ fn compound_amount<'i>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core as bc;
+    use crate::bc;
     use indoc::indoc;
     use pest::Parser;
 
