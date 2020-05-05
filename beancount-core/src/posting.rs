@@ -44,7 +44,7 @@ pub struct Posting<'a> {
     pub price: Option<IncompleteAmount<'a>>,
 
     #[builder(default)]
-    pub flag: Option<Flag>,
+    pub flag: Option<Flag<'a>>,
 
     #[builder(default)]
     pub meta: Meta<'a>,

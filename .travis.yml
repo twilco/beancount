@@ -5,4 +5,6 @@ cache: cargo
 before_script:
   - rustup component add rustfmt
 script:
-  - cargo fmt --all -- --check && cargo test
+  - cargo fmt --all -- --check
+  - cargo test -p beancount-parser
+  - cd beancount-core && cargo test --features chrono

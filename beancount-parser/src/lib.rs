@@ -583,11 +583,7 @@ fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> Cow<'i, str> {
 }
 
 fn flag<'i>(pair: Pair<'i, Rule>) -> bc::Flag {
-    match pair.as_str() {
-        "*" | "txn" => bc::Flag::Okay,
-        "!" => bc::Flag::Warning,
-        s => bc::Flag::Other(s.to_string()),
-    }
+    bc::Flag::from(pair.as_str())
 }
 
 fn compound_amount<'i>(
