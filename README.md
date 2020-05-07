@@ -8,7 +8,7 @@ This repository provides or will provide four main things:
 
 1. A crate (`beancount-core`) that contains a compile-time type-checked builder API and core data structures for representing Beancount data.
 2. A crate (`beancount-parser`) that will parse valid Beancount input and output it's representation as Rust data structures.
-3. A crate to output `beancount-core` structures as a String, file, and more.
+3. A crate to output `beancount-core` structures as a string, file, and more.
 4. A crate (`beancount-sys`) that provides bindings to the [Python Beancount library](https://github.com/beancount/beancount), likely through the use of [pyo3](https://github.com/PyO3/pyo3).  If deemed useful, a crate that exposes higher-level Beancount bindings will be created.  With this work, we could hopefully unlock the ability to integrate with existing Python Beancount plugins.
 
 If any of these things interest you feel free to contact me and/or submit a PR!
