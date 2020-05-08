@@ -14,11 +14,11 @@ pub use posting::Posting;
 pub mod account;
 pub mod account_types;
 pub mod amount;
+mod date;
 pub mod directives;
 pub mod flags;
 pub mod position;
 pub mod posting;
-mod date;
 
 pub use date::Date;
 

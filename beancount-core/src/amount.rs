@@ -45,7 +45,7 @@ impl<'a> From<Amount<'a>> for IncompleteAmount<'a> {
     fn from(val: Amount<'a>) -> Self {
         IncompleteAmount {
             num: Some(val.num),
-            currency: Some(val.currency)
+            currency: Some(val.currency),
         }
     }
 }

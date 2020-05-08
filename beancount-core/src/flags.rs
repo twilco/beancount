@@ -13,15 +13,24 @@ impl Default for Flag<'_> {
     }
 }
 
-impl<'a, I: Into<Cow<'a, str>>> From<I> for Flag<'a> {
-    fn from(s: I) -> Self {
-        let s = s.into();
-        if s == "*" || s == "txn" {
-            Flag::Okay
-        } else if s == "!" {
-            Flag::Warning
-        } else {
-            Flag::Other(s)
+impl<'a> From<&'a str> for Flag<'a> {
+    fn from(s: &'a str) -> Self {
+        Cow::from(s).into()
+    }
+}
+
+impl From<String> for Flag<'static> {
+    fn from(s: String) -> Self {
+        Cow::from(s).into()
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Flag<'a> {
+    fn from(s: Cow<'a, str>) -> Self {
+        match &*s {
+            "*" | "txn" => Flag::Okay,
+            "!" => Flag::Warning,
+            _ => Flag::Other(s),
         }
     }
 }

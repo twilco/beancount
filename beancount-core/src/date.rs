@@ -4,13 +4,29 @@ use std::borrow::Cow;
 use chrono::NaiveDate;
 
 #[derive(Eq, PartialEq, Debug, Clone)]
-pub struct Date<'a> {
-    s: Cow<'a, str>
-}
+pub struct Date<'a>(Cow<'a, str>);
 
 impl<'a> From<Cow<'a, str>> for Date<'a> {
     fn from(s: Cow<'a, str>) -> Self {
-        Date { s }
+        Date(s)
+    }
+}
+
+impl<'a> From<&'a str> for Date<'a> {
+    fn from(s: &'a str) -> Self {
+        Date(Cow::from(s))
+    }
+}
+
+impl From<String> for Date<'static> {
+    fn from(s: String) -> Self {
+        Date(Cow::from(s))
+    }
+}
+
+impl<'a> From<Date<'a>> for Cow<'a, str> {
+    fn from(d: Date<'a>) -> Self {
+        d.0
     }
 }
 
