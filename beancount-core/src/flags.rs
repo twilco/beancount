@@ -19,7 +19,7 @@ impl<'a> From<&'a str> for Flag<'a> {
     }
 }
 
-impl From<String> for Flag<'static> {
+impl From<String> for Flag<'_> {
     fn from(s: String) -> Self {
         Cow::from(s).into()
     }

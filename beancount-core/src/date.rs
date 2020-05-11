@@ -18,7 +18,7 @@ impl<'a> From<&'a str> for Date<'a> {
     }
 }
 
-impl From<String> for Date<'static> {
+impl From<String> for Date<'_> {
     fn from(s: String) -> Self {
         Date(Cow::from(s))
     }
@@ -31,7 +31,7 @@ impl<'a> From<Date<'a>> for Cow<'a, str> {
 }
 
 #[cfg(feature = "chrono")]
-impl From<NaiveDate> for Date<'static> {
+impl From<NaiveDate> for Date<'_> {
     fn from(d: NaiveDate) -> Self {
         Cow::from(d.format("%Y-%m-%d").to_string()).into()
     }
