@@ -14,10 +14,13 @@ pub use posting::Posting;
 pub mod account;
 pub mod account_types;
 pub mod amount;
+mod date;
 pub mod directives;
 pub mod flags;
 pub mod position;
 pub mod posting;
+
+pub use date::Date;
 
 /// Represents the complete ledger consisting of a number of directives.
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
@@ -25,7 +28,6 @@ pub struct Ledger<'a> {
     pub directives: Vec<Directive<'a>>,
 }
 
-pub type Date<'a> = Cow<'a, str>;
 pub type Meta<'a> = HashMap<&'a str, &'a str>;
 pub type Currency<'a> = Cow<'a, str>;
 
