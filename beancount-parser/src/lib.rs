@@ -938,6 +938,22 @@ mod tests {
             )
         );
 
+        // DEPRECATED PIPE SYNTAX
+        parse_ok!(
+            transaction,
+            indoc!(
+                "
+        2014-05-05 txn \"Cafe Mogador\" | \"Lamb tagine with wine\"
+        Liabilities:CreditCard:CapitalOne         -37.45 USD
+        "
+            ),
+            indoc!(
+                "
+        2014-05-05 txn \"Cafe Mogador\" | \"Lamb tagine with wine\"
+        "
+            )
+        );
+
         let source = indoc!(
             "
             2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
