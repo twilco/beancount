@@ -1,9 +1,17 @@
 use beancount_parser::parse;
 
-fn main() {
-    let filename = std::env::args().nth(1).expect("filename argument");
-    let unparsed_file = std::fs::read_to_string(filename).expect("cannot read file");
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let filename = std::env::args().nth(1).ok_or("filename argument")?;
+    let unparsed_file = std::fs::read_to_string(filename)?;
 
-    let ledger = parse(&unparsed_file);
+    let ledger = parse(&unparsed_file)?;
     dbg!(ledger);
+    Ok(())
+}
+
+fn main() {
+    match run() {
+        Err(e) => println!("Error: {}", e),
+        _ => {}
+    }
 }

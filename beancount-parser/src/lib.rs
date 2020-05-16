@@ -12,46 +12,58 @@ use rust_decimal::Decimal;
 
 use beancount_core as bc;
 
+use error::{ParseError, ParseResult};
+
+pub mod error;
+
 macro_rules! construct {
-    ( @fields, $builder:ident, $pairs:ident, ) => {};
-    ( @fields, $builder:ident, $pairs:ident, $field:ident = if $rule:path $then:block else $else:block; $($rest:tt)* ) => {
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, ) => {};
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident = if $rule:path $then:block else $else:block; $($rest:tt)* ) => {
         let $builder = match $pairs.peek() {
             Some(ref p) if p.as_rule() == $rule => {
                 let f = $then;
-                $builder.$field(f($pairs.next().expect(stringify!($field))))
+                let pair = $pairs.next()
+                    .ok_or_else(|| ParseError::invalid_state_with_span(stringify!($field), $span.clone()))?;
+                $builder.$field(f(pair)?)
             },
             _ => $builder.$field($else),
         };
-        construct!(@fields, $builder, $pairs, $($rest)*)
+        construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
-    ( @fields, $builder:ident, $pairs:ident, inner { $($field:tt)* } $($rest:tt)* ) => {
-        let mut inner = $pairs.next().expect("inner pair").into_inner();
-        construct!(@fields, $builder, inner, $($field)*);
-        construct!(@fields, $builder, $pairs, $($rest)*)
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, inner { $($field:tt)* } $($rest:tt)* ) => {
+        let pair = $pairs.next()
+            .ok_or_else(|| ParseError::invalid_state_with_span("inner pair", $span))?;
+        let _span = pair.as_span();
+        let mut inner = pair.into_inner();
+        construct!(@fields, $builder, span, inner, $($field)*);
+        construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
-    ( @fields, $builder:ident, $pairs:ident, let $pat:pat = from $name:ident $block:block; $($rest:tt)* ) => {
-        let $name = $pairs.next().unwrap();
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, let $pat:pat = from $name:ident $block:block; $($rest:tt)* ) => {
+        let $name = $pairs.next()
+            .ok_or_else(|| ParseError::invalid_state_with_span(stringify!($pat), $span.clone()))?;
         let $pat = $block;
-        construct!(@fields, $builder, $pairs, $($rest)*)
+        construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
-    ( @fields, $builder:ident, $pairs:ident, $field:ident ?= $f:expr; $($rest:tt)* ) => {
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident ?= $f:expr; $($rest:tt)* ) => {
         let $builder = $builder.$field($pairs.next().map($f));
-        construct!(@fields, $builder, $pairs, $($rest)*)
+        construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
-    ( @fields, $builder:ident, $pairs:ident, $field:ident := $val:expr; $($rest:tt)* ) => {
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident := $val:expr; $($rest:tt)* ) => {
         let $builder = $builder.$field($val);
-        construct!(@fields, $builder, $pairs, $($rest)*)
+        construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
-    ( @fields, $builder:ident, $pairs:ident, $field:ident = $f:expr; $($rest:tt)* ) => {
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident = $f:expr; $($rest:tt)* ) => {
         let f = $f;
-        let $builder = $builder.$field(f($pairs.next().expect(stringify!($field))));
-        construct!(@fields, $builder, $pairs, $($rest)*)
+        let pair = $pairs.next().ok_or_else(|| ParseError::invalid_state(stringify!($field)))?;
+        let $builder = $builder.$field(f(pair)?);
+        construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
     ( $builder:ty : $pair:expr => { $($field:tt)* } ) => {
         {
             let builder = <$builder>::builder();
+            let _span = $pair.as_span();
             let mut pairs = $pair.into_inner();
-            construct!(@fields, builder, pairs, $($field)*);
+            construct!(@fields, builder, _span, pairs, $($field)*);
             builder.build()
         }
     };
@@ -80,11 +92,10 @@ fn optional_rule<'i>(rule: Rule, pairs: &mut Pairs<'i, Rule>) -> Option<Pair<'i,
     }
 }
 
-pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
-    let parsed = BeancountParser::parse(Rule::file, &input)
-        .expect("successful parse")
+pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
+    let parsed = BeancountParser::parse(Rule::file, &input)?
         .next()
-        .unwrap();
+        .ok_or_else(|| ParseError::invalid_state("non-empty parse result"))?;
 
     let mut state = ParseState {
         root_names: [
@@ -105,7 +116,7 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
         if directive_pair.as_rule() == Rule::EOI {
             break;
         }
-        let dir = directive(directive_pair, &state);
+        let dir = directive(directive_pair, &state)?;
         match dir {
             bc::Directive::Option(ref opt) if opt.name == "name_assets" => {
                 state
@@ -137,59 +148,60 @@ pub fn parse<'i>(input: &'i str) -> bc::Ledger<'i> {
         directives.push(dir);
     }
 
-    bc::Ledger::builder().directives(directives).build()
+    Ok(bc::Ledger::builder().directives(directives).build())
 }
 
-fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
-    match directive.as_rule() {
-        Rule::option => option_directive(directive),
-        Rule::plugin => plugin_directive(directive),
-        Rule::custom => custom_directive(directive),
-        Rule::include => include_directive(directive),
-        Rule::open => open_directive(directive, state),
-        Rule::close => close_directive(directive, state),
-        Rule::commodity_directive => commodity_directive(directive),
-        Rule::note => note_directive(directive, state),
-        Rule::pad => pad_directive(directive, state),
-        Rule::query => query_directive(directive),
-        Rule::event => event_directive(directive),
-        Rule::document => document_directive(directive, state),
-        Rule::price => price_directive(directive),
-        Rule::transaction => transaction_directive(directive, state),
+fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Directive<'i>> {
+    let dir = match directive.as_rule() {
+        Rule::option => option_directive(directive)?,
+        Rule::plugin => plugin_directive(directive)?,
+        Rule::custom => custom_directive(directive)?,
+        Rule::include => include_directive(directive)?,
+        Rule::open => open_directive(directive, state)?,
+        Rule::close => close_directive(directive, state)?,
+        Rule::commodity_directive => commodity_directive(directive)?,
+        Rule::note => note_directive(directive, state)?,
+        Rule::pad => pad_directive(directive, state)?,
+        Rule::query => query_directive(directive)?,
+        Rule::event => event_directive(directive)?,
+        Rule::document => document_directive(directive, state)?,
+        Rule::price => price_directive(directive)?,
+        Rule::transaction => transaction_directive(directive, state)?,
         _ => bc::Directive::Unsupported,
-    }
+    };
+    Ok(dir)
 }
 
-fn option_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn option_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Option(construct! {
+    Ok(bc::Directive::Option(construct! {
         bc::BcOption: directive => {
             name = get_quoted_str;
             val = get_quoted_str;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn plugin_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn plugin_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Plugin(construct! {
+    Ok(bc::Directive::Plugin(construct! {
         bc::Plugin: directive => {
             module = get_quoted_str;
             config = get_quoted_str;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn custom_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn custom_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Custom(construct! {
+    Ok(bc::Directive::Custom(construct! {
         bc::Custom: directive => {
             date = date;
             name = get_quoted_str;
             args = if Rule::custom_value_list {
-                |p: Pair<'i, _>| -> Vec<Cow<'i, str>> {
+                |p: Pair<'i, _>| -> ParseResult<Vec<Cow<'i, str>>> {
                     p.into_inner().map(get_quoted_str).collect()
                 }
             } else {
@@ -198,30 +210,33 @@ fn custom_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn include_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn include_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Include(construct! {
+    Ok(bc::Directive::Include(construct! {
         bc::Include: directive => {
             filename = get_quoted_str;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn open_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+fn open_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Open(construct! {
+    Ok(bc::Directive::Open(construct! {
         bc::Open: directive => {
             date = date;
             account = |p| account(p, state);
             currencies = if Rule::commodity_list {
-                |p: Pair<'i, _>| {
-                    p.into_inner()
+                |p: Pair<'i, _>| -> ParseResult<Vec<_>> {
+                    Ok(p.into_inner()
                         .map(|p| p.as_str().into())
-                        .collect::<Vec<_>>()
+                        .collect())
                 }
             } else {
                 Vec::new()
@@ -229,36 +244,42 @@ fn open_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Dire
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn close_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+fn close_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Close(construct! {
+    Ok(bc::Directive::Close(construct! {
         bc::Close: directive => {
             date = date;
             account = |p| account(p, state);
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn commodity_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn commodity_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Commodity(construct! {
+    Ok(bc::Directive::Commodity(construct! {
         bc::Commodity: directive => {
             date = date;
             name = as_str;
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn note_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+fn note_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Note(construct! {
+    Ok(bc::Directive::Note(construct! {
         bc::Note: directive => {
             date = date;
             account = |p| account(p, state);
@@ -266,12 +287,15 @@ fn note_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Dire
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn pad_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+fn pad_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Pad(construct! {
+    Ok(bc::Directive::Pad(construct! {
         bc::Pad: directive => {
             date = date;
             pad_to_account = |p| account(p, state);
@@ -279,12 +303,12 @@ fn pad_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Direc
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn query_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn query_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Query(construct! {
+    Ok(bc::Directive::Query(construct! {
         bc::Query: directive => {
             date = date;
             name = get_quoted_str;
@@ -292,12 +316,12 @@ fn query_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn event_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn event_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Event(construct! {
+    Ok(bc::Directive::Event(construct! {
         bc::Event: directive => {
             date = date;
             name = get_quoted_str;
@@ -305,12 +329,15 @@ fn event_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+fn document_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Document(construct! {
+    Ok(bc::Directive::Document(construct! {
         bc::Document: directive => {
             date = date;
             account = |p| account(p, state);
@@ -318,12 +345,12 @@ fn document_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn price_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
+fn price_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Price(construct! {
+    Ok(bc::Directive::Price(construct! {
         bc::Price: directive => {
             date = date;
             currency = as_str;
@@ -331,21 +358,27 @@ fn price_directive<'i>(directive: Pair<'i, Rule>) -> bc::Directive<'i> {
             meta = meta_kv;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> bc::Directive<'i> {
+fn transaction_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
-    bc::Directive::Transaction(construct! {
+    Ok(bc::Directive::Transaction(construct! {
         bc::Transaction: directive => {
             date = date;
             flag = flag;
             let (payee, narration) = from pair {
+                let span = pair.as_span();
                 let mut inner = pair.into_inner();
-                let first = inner.next().map(get_quoted_str).unwrap();
+                let first = inner.next().map(get_quoted_str)
+                    .transpose()?
+                    .ok_or_else(|| ParseError::invalid_state_with_span("payee or narration", span))?;
                 let second = inner.next().map(get_quoted_str);
                 if let Some(second) = second {
-                    (Some(first), second)
+                    (Some(first), second?)
                 } else {
                     (None, first)
                 }
@@ -360,10 +393,10 @@ fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> b
                 for p in pair.into_inner() {
                     match p.as_rule() {
                         Rule::posting => {
-                            postings.push(posting(p, state));
+                            postings.push(posting(p, state)?);
                         }
                         Rule::key_value => {
-                            let (k, v) = meta_kv_pair(p);
+                            let (k, v) = meta_kv_pair(p)?;
                             if let Some(last) = postings.last_mut() {
                                 last.meta.insert(k, v);
                             } else {
@@ -391,18 +424,30 @@ fn transaction_directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> b
             links := links;
             source := Some(source);
         }
-    })
+    }))
 }
 
-fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Posting<'i> {
+fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Posting<'i>> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let flag = optional_rule(Rule::txn_flag, &mut inner).map(flag);
-    let account = inner.next().map(|p| account(p, state)).unwrap();
+    let flag = optional_rule(Rule::txn_flag, &mut inner)
+        .map(flag)
+        .transpose()?;
+    let account = inner
+        .next()
+        .map(|p| account(p, state))
+        .transpose()?
+        .ok_or_else(|| ParseError::invalid_state_with_span("account", span))?;
     let units = optional_rule(Rule::incomplete_amount, &mut inner)
         .map(incomplete_amount)
+        .transpose()?
         .unwrap_or_else(|| bc::IncompleteAmount::builder().build());
-    let cost = optional_rule(Rule::cost_spec, &mut inner).map(cost_spec);
-    let price_anno = optional_rule(Rule::price_annotation, &mut inner).map(price_annotation);
+    let cost = optional_rule(Rule::cost_spec, &mut inner)
+        .map(cost_spec)
+        .transpose()?;
+    let price_anno = optional_rule(Rule::price_annotation, &mut inner)
+        .map(price_annotation)
+        .transpose()?;
     let price = match (price_anno, units.num) {
         (
             Some((
@@ -429,91 +474,104 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Posting<'i> {
         (Some((_, p)), _) => Some(p),
         (None, _) => None,
     };
-    bc::Posting {
+    Ok(bc::Posting {
         flag,
         account,
         units,
         cost,
         price,
         meta: bc::Meta::new(),
-    }
+    })
 }
 
-fn num_expr<'i>(pair: Pair<'i, Rule>) -> Decimal {
+fn num_expr<'i>(pair: Pair<'i, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::num_expr);
     PREC_CLIMBER.climb(pair.into_inner(), term, reduce_num_expr)
 }
 
-fn term<'i>(pair: Pair<'i, Rule>) -> Decimal {
+fn term<'i>(pair: Pair<'i, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::term);
+    let span = pair.as_span();
     let mut term_parts = pair.into_inner();
     let prefix = optional_rule(Rule::num_prefix, &mut term_parts).map(|p| p.as_str());
-    let pair = term_parts.next().unwrap();
+    let pair = term_parts
+        .next()
+        .ok_or_else(|| ParseError::invalid_state_with_span("num or num_expr", span))?;
     let mut num_expr = match pair.as_rule() {
         Rule::num => {
             let s = pair.as_str().replace(',', "");
-            Decimal::from_str(&s).unwrap()
+            Decimal::from_str(&s).map_err(|e| ParseError::decimal_parse_error(e, pair.as_span()))?
         }
-        Rule::num_expr => num_expr(pair),
+        Rule::num_expr => num_expr(pair)?,
         _ => unimplemented!(),
     };
     if let Some("-") = prefix {
         num_expr.set_sign_positive(!num_expr.is_sign_positive());
     }
-    num_expr
+    Ok(num_expr)
 }
 
-fn reduce_num_expr<'i>(lhs: Decimal, op: Pair<'i, Rule>, rhs: Decimal) -> Decimal {
-    match op.as_rule() {
+fn reduce_num_expr<'i>(
+    lhs: ParseResult<Decimal>,
+    op: Pair<'i, Rule>,
+    rhs: ParseResult<Decimal>,
+) -> ParseResult<Decimal> {
+    let lhs = lhs?;
+    let rhs = rhs?;
+    Ok(match op.as_rule() {
         Rule::add => lhs + rhs,
         Rule::subtract => lhs - rhs,
         Rule::multiply => lhs * rhs,
         Rule::divide => lhs / rhs,
         _ => unimplemented!(),
-    }
+    })
 }
 
-fn amount<'i>(pair: Pair<'i, Rule>) -> bc::Amount<'i> {
+fn amount<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Amount<'i>> {
     debug_assert!(pair.as_rule() == Rule::amount);
-    construct! {
+    Ok(construct! {
         bc::Amount: pair => {
             num = num_expr;
             currency = as_str;
         }
-    }
+    })
 }
 
-fn incomplete_amount<'i>(pair: Pair<'i, Rule>) -> bc::IncompleteAmount<'i> {
+fn incomplete_amount<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::IncompleteAmount<'i>> {
     debug_assert!(pair.as_rule() == Rule::incomplete_amount);
-    construct! {
+    Ok(construct! {
         bc::IncompleteAmount: pair => {
             num = if Rule::num_expr {
-                |p| Some(num_expr(p))
+                |p| num_expr(p).map(Some)
             } else {
                 None
             };
             currency = if Rule::commodity {
-                |p| Some(as_str(p).into())
+                |p| as_str(p).map(|s| Some(s.into()))
             } else {
                 None
             };
         }
-    }
+    })
 }
 
-fn cost_spec<'i>(pair: Pair<'i, Rule>) -> bc::CostSpec<'i> {
+fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
     debug_assert!(pair.as_rule() == Rule::cost_spec);
     let mut amount = (None, None, None);
     let mut date_ = None;
     let mut label = None;
-    let inner = pair.into_inner().next().unwrap();
+    let span = pair.as_span();
+    let inner = pair
+        .into_inner()
+        .next()
+        .ok_or_else(|| ParseError::invalid_state_with_span("cost spec component", span))?;
     let typ = inner.as_rule();
     for p in inner.into_inner() {
         match p.as_rule() {
-            Rule::date => date_ = Some(date(p).into()),
-            Rule::quoted_str => label = Some(get_quoted_str(p)),
+            Rule::date => date_ = Some(date(p)?.into()),
+            Rule::quoted_str => label = Some(get_quoted_str(p)?),
             Rule::compound_amount => {
-                amount = compound_amount(p);
+                amount = compound_amount(p)?;
             }
             _ => unimplemented!(),
         }
@@ -524,78 +582,111 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> bc::CostSpec<'i> {
         }
         amount = (None, amount.0, amount.2);
     }
-    bc::CostSpec::builder()
+    Ok(bc::CostSpec::builder()
         .number_per(amount.0)
         .number_total(amount.1)
         .currency(amount.2)
         .date(date_)
         .label(label)
-        .build()
+        .build())
 }
 
-fn price_annotation<'i>(pair: Pair<'i, Rule>) -> (bool, bc::IncompleteAmount<'i>) {
+fn price_annotation<'i>(pair: Pair<'i, Rule>) -> ParseResult<(bool, bc::IncompleteAmount<'i>)> {
     debug_assert!(pair.as_rule() == Rule::price_annotation);
-    let inner = pair.into_inner().next().unwrap();
+    let span = pair.as_span();
+    let inner = pair
+        .into_inner()
+        .next()
+        .ok_or_else(|| ParseError::invalid_state_with_span("price annotation", span.clone()))?;
     let is_total = inner.as_rule() == Rule::price_annotation_total;
-    let amount = incomplete_amount(inner.into_inner().next().unwrap());
-    (is_total, amount)
+    let amount = incomplete_amount(
+        inner
+            .into_inner()
+            .next()
+            .ok_or_else(|| ParseError::invalid_state_with_span("incomplete amount", span))?,
+    )?;
+    Ok((is_total, amount))
 }
 
-fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> bc::Account<'i> {
+fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Account<'i>> {
     debug_assert!(pair.as_rule() == Rule::account);
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let first = inner.next().unwrap().as_str();
+    let first_pair = inner
+        .next()
+        .ok_or_else(|| ParseError::invalid_state_with_span("first part of account name", span))?;
+    let first = first_pair.as_str();
     let account_type = state
         .root_names
         .iter()
         .filter(|(_, ref v)| *v == first)
         .map(|(k, _)| k.clone())
         .next()
-        .expect("invalid root account");
+        .ok_or_else(|| {
+            pest::error::Error::new_from_span(
+                pest::error::ErrorVariant::CustomError {
+                    message: "Invalid root account".to_string(),
+                },
+                first_pair.as_span(),
+            )
+        })?;
     let parts: Vec<_> = inner.map(|p| Cow::Borrowed(&p.as_str()[1..])).collect();
-    bc::Account::builder().ty(account_type).parts(parts).build()
+    Ok(bc::Account::builder().ty(account_type).parts(parts).build())
 }
 
-fn as_str<'i>(pair: Pair<'i, Rule>) -> &'i str {
-    pair.as_str()
+fn as_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
+    Ok(pair.as_str())
 }
 
-fn date<'i>(pair: Pair<'i, Rule>) -> &'i str {
-    pair.as_str()
+fn date<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
+    Ok(pair.as_str())
 }
 
-fn meta_kv<'i>(pair: Pair<'i, Rule>) -> HashMap<&'i str, &'i str> {
+fn meta_kv<'i>(pair: Pair<'i, Rule>) -> ParseResult<HashMap<&'i str, &'i str>> {
     debug_assert!(pair.as_rule() == Rule::eol_kv_list);
     pair.into_inner().map(meta_kv_pair).collect()
 }
 
-fn meta_kv_pair<'i>(pair: Pair<'i, Rule>) -> (&'i str, &'i str) {
+fn meta_kv_pair<'i>(pair: Pair<'i, Rule>) -> ParseResult<(&'i str, &'i str)> {
     debug_assert!(pair.as_rule() == Rule::key_value);
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let key = inner.next().unwrap().as_str();
-    let value = inner.next().unwrap().as_str();
-    (key, value)
+    let key = inner
+        .next()
+        .ok_or_else(|| ParseError::invalid_state_with_span("metadata key", span.clone()))?
+        .as_str();
+    let value = inner
+        .next()
+        .ok_or_else(|| ParseError::invalid_state_with_span("metadata value", span))?
+        .as_str();
+    Ok((key, value))
 }
 
-fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> Cow<'i, str> {
+fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<Cow<'i, str>> {
     debug_assert!(pair.as_rule() == Rule::quoted_str);
-    pair.into_inner().next().unwrap().as_str().into()
+    let span = pair.as_span();
+    Ok(pair
+        .into_inner()
+        .next()
+        .ok_or_else(|| ParseError::invalid_state_with_span("quoted string", span))?
+        .as_str()
+        .into())
 }
 
-fn flag<'i>(pair: Pair<'i, Rule>) -> bc::Flag {
-    bc::Flag::from(pair.as_str())
+fn flag<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Flag> {
+    Ok(bc::Flag::from(pair.as_str()))
 }
 
 fn compound_amount<'i>(
     pair: Pair<'i, Rule>,
-) -> (Option<Decimal>, Option<Decimal>, Option<Cow<'i, str>>) {
+) -> ParseResult<(Option<Decimal>, Option<Decimal>, Option<Cow<'i, str>>)> {
     let mut number_per = None;
     let mut number_total = None;
     let mut currency = None;
     for p in pair.into_inner() {
         match p.as_rule() {
             Rule::num_expr => {
-                let num = Some(num_expr(p));
+                let num = Some(num_expr(p)?);
                 if number_per.is_none() {
                     number_per = num;
                 } else {
@@ -608,7 +699,7 @@ fn compound_amount<'i>(
             _ => unimplemented!(),
         }
     }
-    (number_per, number_total, currency)
+    Ok((number_per, number_total, currency))
 }
 
 #[cfg(test)]
@@ -961,7 +1052,7 @@ mod tests {
             "
         );
         assert_eq!(
-            parse(&source),
+            parse(&source).unwrap(),
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
