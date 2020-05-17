@@ -155,17 +155,17 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> ParseResult<b
     let dir = match directive.as_rule() {
         Rule::option => option_directive(directive)?,
         Rule::plugin => plugin_directive(directive)?,
-        Rule::custom => custom_directive(directive)?,
+        Rule::custom => custom_directive(directive, state)?,
         Rule::include => include_directive(directive)?,
         Rule::open => open_directive(directive, state)?,
         Rule::close => close_directive(directive, state)?,
-        Rule::commodity_directive => commodity_directive(directive)?,
+        Rule::commodity_directive => commodity_directive(directive, state)?,
         Rule::note => note_directive(directive, state)?,
         Rule::pad => pad_directive(directive, state)?,
-        Rule::query => query_directive(directive)?,
-        Rule::event => event_directive(directive)?,
+        Rule::query => query_directive(directive, state)?,
+        Rule::event => event_directive(directive, state)?,
         Rule::document => document_directive(directive, state)?,
-        Rule::price => price_directive(directive)?,
+        Rule::price => price_directive(directive, state)?,
         Rule::transaction => transaction_directive(directive, state)?,
         _ => bc::Directive::Unsupported,
     };
@@ -194,7 +194,10 @@ fn plugin_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<
     }))
 }
 
-fn custom_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
+fn custom_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
     Ok(bc::Directive::Custom(construct! {
         bc::Custom: directive => {
@@ -207,7 +210,7 @@ fn custom_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<
             } else {
                 Vec::new()
             };
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
@@ -241,7 +244,7 @@ fn open_directive<'i>(
             } else {
                 Vec::new()
             };
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
@@ -256,19 +259,22 @@ fn close_directive<'i>(
         bc::Close: directive => {
             date = date;
             account = |p| account(p, state);
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
 }
 
-fn commodity_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
+fn commodity_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
     Ok(bc::Directive::Commodity(construct! {
         bc::Commodity: directive => {
             date = date;
             name = as_str;
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
@@ -284,7 +290,7 @@ fn note_directive<'i>(
             date = date;
             account = |p| account(p, state);
             comment = as_str;
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
@@ -300,33 +306,39 @@ fn pad_directive<'i>(
             date = date;
             pad_to_account = |p| account(p, state);
             pad_from_account = |p| account(p, state);
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
 }
 
-fn query_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
+fn query_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
     Ok(bc::Directive::Query(construct! {
         bc::Query: directive => {
             date = date;
             name = get_quoted_str;
             query_string = get_quoted_str;
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
 }
 
-fn event_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
+fn event_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
     Ok(bc::Directive::Event(construct! {
         bc::Event: directive => {
             date = date;
             name = get_quoted_str;
             description = get_quoted_str;
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
@@ -342,20 +354,23 @@ fn document_directive<'i>(
             date = date;
             account = |p| account(p, state);
             path = get_quoted_str;
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
 }
 
-fn price_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<'i>> {
+fn price_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
     let source = directive.as_str();
     Ok(bc::Directive::Price(construct! {
         bc::Price: directive => {
             date = date;
             currency = as_str;
             amount = amount;
-            meta = meta_kv;
+            meta = |p| meta_kv(p, state);
             source := Some(source);
         }
     }))
@@ -387,7 +402,7 @@ fn transaction_directive<'i>(
             narration := narration;
             let (meta, tags, links, postings) = from pair {
                 let mut postings: Vec<bc::Posting<'i>> = Vec::new();
-                let mut tx_meta = bc::Meta::new();
+                let mut tx_meta = bc::metadata::Meta::new();
                 let mut tx_tags = HashSet::new();
                 let mut tx_links = HashSet::new();
                 for p in pair.into_inner() {
@@ -396,7 +411,7 @@ fn transaction_directive<'i>(
                             postings.push(posting(p, state)?);
                         }
                         Rule::key_value => {
-                            let (k, v) = meta_kv_pair(p)?;
+                            let (k, v) = meta_kv_pair(p, state)?;
                             if let Some(last) = postings.last_mut() {
                                 last.meta.insert(k, v);
                             } else {
@@ -480,7 +495,7 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
         units,
         cost,
         price,
-        meta: bc::Meta::new(),
+        meta: bc::metadata::Meta::new(),
     })
 }
 
@@ -642,12 +657,15 @@ fn date<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
     Ok(pair.as_str())
 }
 
-fn meta_kv<'i>(pair: Pair<'i, Rule>) -> ParseResult<HashMap<&'i str, &'i str>> {
+fn meta_kv<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::metadata::Meta<'i>> {
     debug_assert!(pair.as_rule() == Rule::eol_kv_list);
-    pair.into_inner().map(meta_kv_pair).collect()
+    pair.into_inner().map(|p| meta_kv_pair(p, state)).collect()
 }
 
-fn meta_kv_pair<'i>(pair: Pair<'i, Rule>) -> ParseResult<(&'i str, &'i str)> {
+fn meta_kv_pair<'i>(
+    pair: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<(Cow<'i, str>, bc::metadata::MetaValue<'i>)> {
     debug_assert!(pair.as_rule() == Rule::key_value);
     let span = pair.as_span();
     let mut inner = pair.into_inner();
@@ -655,11 +673,22 @@ fn meta_kv_pair<'i>(pair: Pair<'i, Rule>) -> ParseResult<(&'i str, &'i str)> {
         .next()
         .ok_or_else(|| ParseError::invalid_state_with_span("metadata key", span.clone()))?
         .as_str();
-    let value = inner
+    let value_pair = inner
         .next()
-        .ok_or_else(|| ParseError::invalid_state_with_span("metadata value", span))?
-        .as_str();
-    Ok((key, value))
+        .and_then(|p| p.into_inner().next())
+        .ok_or_else(|| ParseError::invalid_state_with_span("metadata value", span))?;
+    let value = match value_pair.as_rule() {
+        Rule::quoted_str => bc::metadata::MetaValue::Text(get_quoted_str(value_pair)?),
+        Rule::account => bc::metadata::MetaValue::Account(account(value_pair, state)?),
+        Rule::date => bc::metadata::MetaValue::Date(date(value_pair)?.into()),
+        Rule::commodity => bc::metadata::MetaValue::Currency(value_pair.as_str().into()),
+        Rule::tag => bc::metadata::MetaValue::Tag((&value_pair.as_str()[1..]).into()),
+        Rule::bool => bc::metadata::MetaValue::Bool(value_pair.as_str() == "true"),
+        Rule::amount => bc::metadata::MetaValue::Amount(amount(value_pair)?),
+        Rule::num_expr => bc::metadata::MetaValue::Number(num_expr(value_pair)?),
+        _ => unimplemented!(),
+    };
+    Ok((key.into(), value))
 }
 
 fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<Cow<'i, str>> {
