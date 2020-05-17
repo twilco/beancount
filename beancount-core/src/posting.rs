@@ -3,8 +3,8 @@ use typed_builder::TypedBuilder;
 use super::account::Account;
 use super::amount::IncompleteAmount;
 use super::flags::Flag;
+use super::metadata::Meta;
 use super::position::CostSpec;
-use super::Meta;
 
 /// Represents a transaction posting.  Postings represent a single amount being deposited to or
 /// withdrawn from an account.

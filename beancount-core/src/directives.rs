@@ -7,8 +7,9 @@ use typed_builder::TypedBuilder;
 use super::account::Account;
 use super::amount::Amount;
 use super::flags::Flag;
+use super::metadata::{Link, Meta, Tag};
 use super::posting::Posting;
-use super::{Currency, Date, Link, Meta, Tag};
+use super::{Currency, Date};
 
 /// The set of booking methods for positions on accounts.
 #[derive(Clone, Debug, Eq, PartialEq)]
