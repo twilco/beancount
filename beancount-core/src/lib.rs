@@ -6,6 +6,7 @@ use typed_builder::TypedBuilder;
 pub use account::Account;
 pub use account_types::AccountType;
 pub use amount::{Amount, IncompleteAmount};
+pub use date::Date;
 pub use directives::*;
 pub use flags::Flag;
 pub use position::CostSpec;
@@ -19,8 +20,6 @@ pub mod directives;
 pub mod flags;
 pub mod position;
 pub mod posting;
-
-pub use date::Date;
 
 /// Represents the complete ledger consisting of a number of directives.
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
