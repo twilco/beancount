@@ -131,9 +131,8 @@ flag_merging = @{ "M" }
 // A flag to indicate forecasted transactions.  See here for more info:
 // https://bitbucket.org/blais/beancount/src/487cb9b0248427ac6882889b6b8bcc1665ce393e/beancount/plugins/forecast.py?at=default&fileviewer=file-view-default
 flag_forecasted = @{ "#" }
-// TODO: Consider adding support for deprecated pipe syntax.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-341
-// https://github.com/twilco/beancount/issues/2
-txn_strings = { quoted_str ~ quoted_str? }
+// Transaction strings, including the deprecated pipe syntax.
+txn_strings = { quoted_str ~ "|"? ~ quoted_str? }
 posting = !{
     //   ! Assets:BofA:Checking 1234.32 USD {{502.12 # 9.95 USD, 2018-01-01}} @@ 173.12 US
     (account | txn_flag ~ account) ~ ( incomplete_amount ~ cost_spec? ~ price_annotation? )?
