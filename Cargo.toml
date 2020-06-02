@@ -1,2 +1,2 @@
 [workspace]
-members = ["beancount-core", "beancount-parser"]
+members = ["beancount-core", "beancount-parser", "beancount-render"]
