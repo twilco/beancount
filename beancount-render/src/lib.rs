@@ -309,6 +309,7 @@ impl<'a, W: Write> Renderer<&'a Transaction<'_>, W> for BasicRenderer {
         for link in &transaction.links {
             write!(w, " {}", link)?;
         }
+        writeln!(w)?;
         for posting in &transaction.postings {
             self.render(posting, w)?;
         }
@@ -335,6 +336,7 @@ impl<'a, W: Write> Renderer<&'a Posting<'_>, W> for BasicRenderer {
             write!(w, " ")?;
             self.render(cost, w)?;
         }
+        writeln!(w)?;
         render_key_value(self, w, &posting.meta)
     }
 }
