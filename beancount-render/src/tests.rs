@@ -6,15 +6,17 @@ fn test_conversion(s: &str) -> anyhow::Result<()> {
     let ledger = parse(s).unwrap();
 
     // Now render it
-    let mut rendered = String::new();
+    let mut rendered = Vec::new();
     render(&mut rendered, &ledger)?;
+    let rendered = String::from_utf8(rendered).unwrap();
 
     // Parse again
     let ledger_2 = parse(&rendered).unwrap();
 
     // Render to test for equality
-    let mut rendered_2 = String::new();
+    let mut rendered_2 = Vec::new();
     render(&mut rendered_2, &ledger_2)?;
+    let rendered_2 = String::from_utf8(rendered_2).unwrap();
 
     // Check for equality
     assert_eq!(rendered_2, rendered);

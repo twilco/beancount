@@ -2,7 +2,7 @@ use beancount_core::*;
 use metadata::MetaValue;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::{fmt, fmt::Write};
+use std::{io, io::Write};
 use thiserror::Error;
 
 #[cfg(test)]
@@ -24,7 +24,7 @@ pub fn render<W: Write>(w: &mut W, ledger: &Ledger<'_>) -> Result<(), BasicRende
 #[derive(Error, Debug)]
 pub enum BasicRendererError {
     #[error("an io error occurred")]
-    Fmt(#[from] fmt::Error),
+    Io(#[from] io::Error),
     #[error("could not render unsupported directive")]
     Unsupported,
 }
