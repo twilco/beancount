@@ -1,0 +1,15 @@
+[package]
+name = "beancount-render"
+version = "0.1.0"
+authors = ["Thomas <denhollander.thomas@gmail.com>"]
+edition = "2018"
+
+[lib]
+
+[dependencies]
+beancount-core = { path = "../beancount-core" }
+thiserror = "1"
+
+[dev-dependencies]
+beancount-parser = { path = "../beancount-parser" }
+anyhow = "1"

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::{fmt, fmt::Display};
 
 #[cfg(feature = "chrono")]
 use chrono::NaiveDate;
@@ -27,6 +28,12 @@ impl From<String> for Date<'_> {
 impl<'a> From<Date<'a>> for Cow<'a, str> {
     fn from(d: Date<'a>) -> Self {
         d.0
+    }
+}
+
+impl Display for Date<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
