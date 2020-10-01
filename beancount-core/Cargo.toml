@@ -12,5 +12,5 @@ travis-ci = { repository = "twilco/beancount", branch = "master" }
 
 [dependencies]
 typed-builder = "0.3"
-rust_decimal = "1.0"
+rust_decimal = "1"
 chrono = { version = "0.4", optional = true }
