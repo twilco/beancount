@@ -12,8 +12,8 @@ travis-ci = { repository = "twilco/beancount", branch = "master" }
 
 [dependencies]
 beancount-core = { version = "0.2", path = "../beancount-core" }
-pest = "2.1.2"
-pest_derive = "2.1.0"
-indoc = "0.3"
-rust_decimal = "1.0"
-lazy_static = "1.3"
+pest = "2"
+pest_derive = "2"
+indoc = "1"
+rust_decimal = "1"
+lazy_static = "1"
