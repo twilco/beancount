@@ -55,7 +55,7 @@ macro_rules! construct {
     ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident = $f:expr; $($rest:tt)* ) => {
         let f = $f;
         let pair = $pairs.next().ok_or_else(|| ParseError::invalid_state(stringify!($field)))?;
-        let $builder = $builder.$field(f(pair)?);
+        let $builder = $builder.$field(f(pair)?.into());
         construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
     ( $builder:ty : $pair:expr => { $($field:tt)* } ) => {
@@ -1085,9 +1085,9 @@ mod tests {
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
-                        .date("2014-05-05")
+                        .date("2014-05-05".into())
                         .payee(Some("Cafe Mogador".into()))
-                        .narration("Lamb tagine with wine")
+                        .narration("Lamb tagine with wine".into())
                         .postings(vec![bc::Posting::builder()
                             .account(
                                 bc::Account::builder()
@@ -1101,12 +1101,12 @@ mod tests {
                                     .currency(Some("USD".into()))
                                     .build()
                             )
-                            .cost(
+                            .cost(Some(
                                 bc::CostSpec::builder()
                                     .number_per(Some(15.into()))
                                     .currency(Some("GBP".into()))
                                     .build()
-                            )
+                            ))
                             .price(Some(
                                 bc::IncompleteAmount::builder()
                                     .num(Some(20.into()))
@@ -1114,7 +1114,7 @@ mod tests {
                                     .build()
                             ))
                             .build()])
-                        .source(source)
+                        .source(Some(source))
                         .build()
                 )]
             }
