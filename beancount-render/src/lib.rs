@@ -328,13 +328,13 @@ impl<'a, W: Write> Renderer<&'a Posting<'_>, W> for BasicRenderer {
         self.render(&posting.account, w)?;
         write!(w, "\t")?;
         self.render(&posting.units, w)?;
-        if let Some(price) = &posting.price {
-            write!(w, " @ ")?;
-            self.render(price, w)?;
-        }
         if let Some(cost) = &posting.cost {
             write!(w, " ")?;
             self.render(cost, w)?;
+        }
+        if let Some(price) = &posting.price {
+            write!(w, " @ ")?;
+            self.render(price, w)?;
         }
         writeln!(w)?;
         render_key_value(self, w, &posting.meta)
