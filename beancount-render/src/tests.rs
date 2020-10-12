@@ -1,5 +1,6 @@
 use crate::render;
 use beancount_parser::parse;
+use indoc::indoc;
 
 fn test_conversion(s: &str) -> anyhow::Result<()> {
     // First obtain the ledger
@@ -83,5 +84,16 @@ fn test_price() -> anyhow::Result<()> {
 #[test]
 fn test_query() -> anyhow::Result<()> {
     test_conversion("2014-07-09 query \"france-balances\" \"SELECT account, sum(position) WHERE ‘trip-france-2014’ in tags\"\n")?;
+    Ok(())
+}
+
+#[test]
+fn test_transaction() -> anyhow::Result<()> {
+    test_conversion(indoc! {r#"
+        2020-10-01 * "Sell"
+          Assets:Trading             -1 HOOL {500.00 USD} @ 585.00 USD
+          Assets:Trading         585.00 USD
+          Income:Trading:Gains
+    "#})?;
     Ok(())
 }
