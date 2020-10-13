@@ -13,3 +13,4 @@ thiserror = "1"
 [dev-dependencies]
 beancount-parser = { path = "../beancount-parser" }
 anyhow = "1"
+indoc = "1"
