@@ -480,12 +480,12 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
     })
 }
 
-fn num_expr<'i>(pair: Pair<'i, Rule>) -> ParseResult<Decimal> {
+fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::num_expr);
     PREC_CLIMBER.climb(pair.into_inner(), term, reduce_num_expr)
 }
 
-fn term<'i>(pair: Pair<'i, Rule>) -> ParseResult<Decimal> {
+fn term(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::term);
     let span = pair.as_span();
     let mut term_parts = pair.into_inner();
@@ -573,7 +573,7 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
         }
     }
     if typ == Rule::cost_spec_total {
-        if !amount.1.is_none() {
+        if amount.1.is_some() {
             panic!("Per-unit cost may not be specified using total cost");
         }
         amount = (None, amount.0, amount.2);
@@ -616,7 +616,7 @@ fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Acco
         .root_names
         .iter()
         .filter(|(_, ref v)| *v == first)
-        .map(|(k, _)| k.clone())
+        .map(|(k, _)| *k)
         .next()
         .ok_or_else(|| {
             pest::error::Error::new_from_span(
@@ -683,7 +683,7 @@ fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<Cow<'i, str>> {
         .into())
 }
 
-fn flag<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Flag> {
+fn flag(pair: Pair<'_, Rule>) -> ParseResult<bc::Flag> {
     Ok(bc::Flag::from(pair.as_str()))
 }
 

@@ -39,7 +39,7 @@ impl<'a, W: Write> Renderer<&'a Ledger<'_>, W> for BasicRenderer {
     fn render(&self, ledger: &'a Ledger<'_>, write: &mut W) -> Result<(), Self::Error> {
         for directive in &ledger.directives {
             self.render(directive, write)?;
-            writeln!(write, "")?;
+            writeln!(write)?;
         }
         Ok(())
     }
@@ -77,12 +77,12 @@ impl<'a, W: Write> Renderer<&'a Directive<'_>, W> for BasicRenderer {
             Price(price) => self.render(price, write),
             Query(query) => self.render(query, write),
             Transaction(transaction) => self.render(transaction, write),
-            Unsupported => return Err(BasicRendererError::Unsupported),
+            Unsupported => Err(BasicRendererError::Unsupported),
         }
     }
 }
 
-fn render_key_value<'a, W: Write>(
+fn render_key_value<W: Write>(
     renderer: &BasicRenderer,
     w: &mut W,
     kv: &HashMap<Cow<'_, str>, MetaValue<'_>>,
@@ -130,7 +130,7 @@ impl<'a, W: Write> Renderer<&'a Open<'_>, W> for BasicRenderer {
             Booking::Fifo => write!(write, r#" "fifo""#)?,
             Booking::Lifo => write!(write, r#" "lifo""#)?,
         };
-        writeln!(write, "")?;
+        writeln!(write)?;
         render_key_value(self, write, &open.meta)?;
         Ok(())
     }
@@ -141,7 +141,7 @@ impl<'a, W: Write> Renderer<&'a Close<'_>, W> for BasicRenderer {
     fn render(&self, close: &'a Close<'_>, write: &mut W) -> Result<(), Self::Error> {
         write!(write, "{} close ", close.date)?;
         self.render(&close.account, write)?;
-        writeln!(write, "")?;
+        writeln!(write)?;
         render_key_value(self, write, &close.meta)?;
         Ok(())
     }
@@ -167,7 +167,7 @@ impl<'a, W: Write> Renderer<&'a Balance<'_>, W> for BasicRenderer {
         self.render(&balance.account, w)?;
         write!(w, "\t")?;
         self.render(&balance.amount, w)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         render_key_value(self, w, &balance.meta)?;
         Ok(())
     }
@@ -249,7 +249,7 @@ impl<'a, W: Write> Renderer<&'a Pad<'_>, W> for BasicRenderer {
         self.render(&pad.pad_to_account, w)?;
         write!(w, " ")?;
         self.render(&pad.pad_from_account, w)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         render_key_value(self, w, &pad.meta)
     }
 }
@@ -261,7 +261,7 @@ impl<'a, W: Write> Renderer<&'a Plugin<'_>, W> for BasicRenderer {
         if let Some(config) = &plugin.config {
             write!(w, " \"{}\"", config)?;
         }
-        writeln!(w, "")?;
+        writeln!(w)?;
         Ok(())
     }
 }
@@ -271,7 +271,7 @@ impl<'a, W: Write> Renderer<&'a Price<'_>, W> for BasicRenderer {
     fn render(&self, price: &'a Price<'_>, w: &mut W) -> Result<(), Self::Error> {
         write!(w, "{} price {} ", price.date, price.currency)?;
         self.render(&price.amount, w)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         render_key_value(self, w, &price.meta)
     }
 }
