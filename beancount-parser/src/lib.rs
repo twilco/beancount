@@ -564,7 +564,7 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
     let typ = inner.as_rule();
     for p in inner.into_inner() {
         match p.as_rule() {
-            Rule::date => date_ = Some(date(p)?.into()),
+            Rule::date => date_ = Some(date(p)?),
             Rule::quoted_str => label = Some(get_quoted_str(p)?),
             Rule::compound_amount => {
                 amount = compound_amount(p)?;
@@ -634,8 +634,8 @@ fn as_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
     Ok(pair.as_str())
 }
 
-fn date<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
-    Ok(pair.as_str())
+fn date<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Date<'i>> {
+    Ok(bc::Date::from_str_unchecked(pair.as_str()))
 }
 
 fn meta_kv<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::metadata::Meta<'i>> {
@@ -661,7 +661,7 @@ fn meta_kv_pair<'i>(
     let value = match value_pair.as_rule() {
         Rule::quoted_str => bc::metadata::MetaValue::Text(get_quoted_str(value_pair)?),
         Rule::account => bc::metadata::MetaValue::Account(account(value_pair, state)?),
-        Rule::date => bc::metadata::MetaValue::Date(date(value_pair)?.into()),
+        Rule::date => bc::metadata::MetaValue::Date(date(value_pair)?),
         Rule::commodity => bc::metadata::MetaValue::Currency(value_pair.as_str().into()),
         Rule::tag => bc::metadata::MetaValue::Tag((&value_pair.as_str()[1..]).into()),
         Rule::bool => bc::metadata::MetaValue::Bool(value_pair.as_str() == "true"),
@@ -1066,7 +1066,7 @@ mod tests {
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
-                        .date("2014-05-05".into())
+                        .date(bc::Date::from_str_unchecked("2014-05-05"))
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine".into())
                         .postings(vec![bc::Posting::builder()
