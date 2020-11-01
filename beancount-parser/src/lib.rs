@@ -85,6 +85,18 @@ struct ParseState {
     root_names: HashMap<bc::AccountType, String>,
 }
 
+impl ParseState {
+    fn new() -> Self {
+        use bc::AccountType::*;
+        ParseState {
+            root_names: [Assets, Liabilities, Equity, Income, Expenses]
+                .iter()
+                .map(|ty| (*ty, ty.default_name().to_string()))
+                .collect(),
+        }
+    }
+}
+
 fn optional_rule<'i>(rule: Rule, pairs: &mut Pairs<'i, Rule>) -> Option<Pair<'i, Rule>> {
     match pairs.peek() {
         Some(ref p) if p.as_rule() == rule => pairs.next(),
@@ -97,19 +109,7 @@ pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
         .next()
         .ok_or_else(|| ParseError::invalid_state("non-empty parse result"))?;
 
-    let mut state = ParseState {
-        root_names: [
-            (bc::AccountType::Assets, "Assets".to_string()),
-            (bc::AccountType::Liabilities, "Liabilities".to_string()),
-            (bc::AccountType::Equity, "Equity".to_string()),
-            (bc::AccountType::Income, "Income".to_string()),
-            (bc::AccountType::Expenses, "Expenses".to_string()),
-        ]
-        .iter()
-        .cloned()
-        .collect(),
-    };
-
+    let mut state = ParseState::new();
     let mut directives = Vec::new();
 
     for directive_pair in parsed.into_inner() {
@@ -117,34 +117,15 @@ pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
             break;
         }
         let dir = directive(directive_pair, &state)?;
-        match dir {
-            bc::Directive::Option(ref opt) if opt.name == "name_assets" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Assets, opt.val.to_string());
+
+        // Change the root account names on such an option:
+        // option "name_assets" "Assets"
+        if let bc::Directive::Option(ref opt) = dir {
+            if let Some((account_type, account_name)) = opt.root_name_change() {
+                state.root_names.insert(account_type, account_name);
             }
-            bc::Directive::Option(ref opt) if opt.name == "name_liabilities" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Liabilities, opt.val.to_string());
-            }
-            bc::Directive::Option(ref opt) if opt.name == "name_equity" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Equity, opt.val.to_string());
-            }
-            bc::Directive::Option(ref opt) if opt.name == "name_income" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Income, opt.val.to_string());
-            }
-            bc::Directive::Option(ref opt) if opt.name == "name_expenses" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Expenses, opt.val.to_string());
-            }
-            _ => {}
         }
+
         directives.push(dir);
     }
 

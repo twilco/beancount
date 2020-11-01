@@ -153,13 +153,7 @@ impl<'a, W: Write> Renderer<&'a Account<'_>, W> for BasicRenderer {
         write!(
             write,
             "{}:{}",
-            match account.ty {
-                AccountType::Assets => "Assets",
-                AccountType::Liabilities => "Liabilities",
-                AccountType::Equity => "Equity",
-                AccountType::Income => "Income",
-                AccountType::Expenses => "Expenses",
-            },
+            account.ty.default_name(),
             account.parts.join(":")
         )?;
         Ok(())
