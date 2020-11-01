@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Flag<'a> {
@@ -31,6 +32,16 @@ impl<'a> From<Cow<'a, str>> for Flag<'a> {
             "*" | "txn" => Flag::Okay,
             "!" => Flag::Warning,
             _ => Flag::Other(s),
+        }
+    }
+}
+
+impl fmt::Display for Flag<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Flag::Okay => write!(f, "*"),
+            Flag::Warning => write!(f, "!"),
+            Flag::Other(s) => write!(f, "{}", s),
         }
     }
 }

@@ -4,6 +4,20 @@ use std::{fmt, fmt::Display};
 #[cfg(feature = "chrono")]
 use chrono::NaiveDate;
 
+/// Represents a beancount date. It can be created using the `from_*_unchecked` methods.
+/// Alternatively, with the `chrono` feature enabled, it can be converted from a `NaiveDate`.
+/// 
+/// # Example
+/// ```rust
+/// use beancount_core::Date;
+/// 
+/// // Create a Date from a String
+/// let _date_1: Date<'static> = Date::from_str_unchecked("2020-01-01");
+/// 
+/// // Create a Date from a chrono type.
+/// #[cfg(feature = "chrono")]
+/// let _date_2: Date<'static> = chrono::Local::today().naive_local().into();
+/// ```
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Date<'a>(Cow<'a, str>);
 

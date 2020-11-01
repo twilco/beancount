@@ -117,11 +117,8 @@ impl<'a, W: Write> Renderer<&'a Open<'_>, W> for BasicRenderer {
     fn render(&self, open: &'a Open<'_>, write: &mut W) -> Result<(), Self::Error> {
         write!(write, "{} open ", open.date)?;
         self.render(&open.account, write)?;
-        for (i, currency) in open.currencies.iter().enumerate() {
-            write!(write, "{}", currency)?;
-            if i < open.currencies.len() - 1 {
-                write!(write, " ")?;
-            }
+        for currency in open.currencies.iter() {
+            write!(write, " {}", currency)?;
         }
         match open.booking {
             Booking::Strict => write!(write, r#" "strict""#)?,
@@ -291,8 +288,7 @@ impl<'a, W: Write> Renderer<&'a Query<'_>, W> for BasicRenderer {
 impl<'a, W: Write> Renderer<&'a Transaction<'_>, W> for BasicRenderer {
     type Error = BasicRendererError;
     fn render(&self, transaction: &'a Transaction<'_>, w: &mut W) -> Result<(), Self::Error> {
-        write!(w, "{} ", transaction.date)?;
-        self.render(&transaction.flag, w)?;
+        write!(w, "{} {}", transaction.date, transaction.flag)?;
         if let Some(payee) = &transaction.payee {
             write!(w, " \"{}\"", payee)?;
         }
@@ -316,8 +312,7 @@ impl<'a, W: Write> Renderer<&'a Posting<'_>, W> for BasicRenderer {
     fn render(&self, posting: &'a Posting<'_>, w: &mut W) -> Result<(), Self::Error> {
         write!(w, "\t")?;
         if let Some(flag) = &posting.flag {
-            self.render(flag, w)?;
-            write!(w, " ")?;
+            write!(w, "{} ", flag)?;
         }
         self.render(&posting.account, w)?;
         write!(w, "\t")?;
@@ -332,18 +327,6 @@ impl<'a, W: Write> Renderer<&'a Posting<'_>, W> for BasicRenderer {
         }
         writeln!(w)?;
         render_key_value(self, w, &posting.meta)
-    }
-}
-
-impl<'a, W: Write> Renderer<&'a Flag<'_>, W> for BasicRenderer {
-    type Error = BasicRendererError;
-    fn render(&self, flag: &'a Flag, w: &mut W) -> Result<(), Self::Error> {
-        match flag {
-            Flag::Okay => write!(w, "*")?,
-            Flag::Warning => write!(w, "!")?,
-            Flag::Other(s) => write!(w, "{}", s)?,
-        };
-        Ok(())
     }
 }
 
