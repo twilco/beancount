@@ -15,7 +15,7 @@ impl AccountType {
     ///
     /// # Example
     /// ```rust
-    /// use AccountType::*;
+    /// use beancount_core::AccountType::*;
     /// assert_eq!(Assets.default_name(), "Assets");
     /// assert_eq!(Liabilities.default_name(), "Liabilities");
     /// assert_eq!(Equity.default_name(), "Equity");
