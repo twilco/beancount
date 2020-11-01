@@ -1,6 +1,16 @@
 use std::borrow::Cow;
 use std::fmt;
 
+/// A flag for a posting or transaction.
+/// 
+/// # Example
+/// ```rust
+/// use beancount_core::Flag;
+/// assert_eq!(Flag::default(), Flag::Okay);
+/// assert_eq!(Flag::from("*"), Flag::Okay);
+/// assert_eq!(Flag::from("!"), Flag::Warning);
+/// assert_eq!(Flag::from(":)"), Flag::Other(":)".into()));
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Flag<'a> {
     Okay,
