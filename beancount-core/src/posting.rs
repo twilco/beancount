@@ -27,7 +27,7 @@ use super::position::CostSpec;
 /// ```
 ///
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.mtqrwt24wnzs>
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
 pub struct Posting<'a> {
     /// Account being posted to.
     pub account: Account<'a>,

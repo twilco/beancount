@@ -7,7 +7,8 @@ use rust_decimal::Decimal;
 pub type Meta<'a> = HashMap<Cow<'a, str>, MetaValue<'a>>;
 
 /// An enum of the valid values in a metadata map.
-#[derive(Eq, PartialEq, Debug, Clone)]
+// TODO: Implement Display
+#[derive(Eq, PartialEq, Debug, Clone, Hash)]
 pub enum MetaValue<'a> {
     Text(Cow<'a, str>),
     Account(super::account::Account<'a>),

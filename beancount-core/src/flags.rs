@@ -11,7 +11,8 @@ use std::fmt;
 /// assert_eq!(Flag::from("!"), Flag::Warning);
 /// assert_eq!(Flag::from(":)"), Flag::Other(":)".into()));
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq)]
+// TODO: Make sure that the variant Other("*") can't be created, since Other("*") != Okay
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Flag<'a> {
     Okay,
     Warning,

@@ -6,7 +6,7 @@ use typed_builder::TypedBuilder;
 use super::amount::Amount;
 use super::{Currency, Date};
 
-#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, TypedBuilder)]
 pub struct Cost<'a> {
     pub number: Decimal,
     pub currency: Currency<'a>,
@@ -21,7 +21,7 @@ pub struct Cost<'a> {
 /// Represents a "cost", which typically belongs to a [Posting](struct.Posting.html).
 ///
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.mtqrwt24wnzs>
-#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, TypedBuilder)]
 pub struct CostSpec<'a> {
     #[builder(default)]
     pub number_per: Option<Decimal>,
@@ -38,7 +38,7 @@ pub struct CostSpec<'a> {
     pub label: Option<Cow<'a, str>>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, TypedBuilder)]
 pub struct Position<'a> {
     pub units: Amount<'a>,
     pub cost: Option<Cost<'a>>,
