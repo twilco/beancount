@@ -1,6 +1,6 @@
-use std::convert::TryFrom;
-use std::cmp;
 use rust_decimal::Decimal;
+use std::cmp;
+use std::convert::TryFrom;
 use typed_builder::TypedBuilder;
 
 use super::Currency;

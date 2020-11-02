@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 /// A flag for a posting or transaction.
-/// 
+///
 /// # Example
 /// ```rust
 /// use beancount_core::Flag;

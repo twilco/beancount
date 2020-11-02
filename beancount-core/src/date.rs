@@ -6,16 +6,16 @@ use chrono::NaiveDate;
 
 /// Represents a beancount date. It can be created using the `from_*_unchecked` methods.
 /// Alternatively, with the `chrono` feature enabled, it can be converted from a `NaiveDate`.
-/// 
+///
 /// # Example
 /// ```rust
 /// use beancount_core::Date;
-/// 
+///
 /// // Create a Date from a String
 /// let past: Date<'static> = Date::from_str_unchecked("2020-01-01");
 /// let later: Date<'static> = Date::from_str_unchecked("43020-01-01");
 /// assert!(later > past);
-/// 
+///
 /// // Create a Date from a chrono type.
 /// #[cfg(feature = "chrono")]
 /// let today: Date<'static> = chrono::Local::today().naive_local().into();
