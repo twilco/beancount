@@ -85,6 +85,18 @@ struct ParseState {
     root_names: HashMap<bc::AccountType, String>,
 }
 
+impl ParseState {
+    fn new() -> Self {
+        use bc::AccountType::*;
+        ParseState {
+            root_names: [Assets, Liabilities, Equity, Income, Expenses]
+                .iter()
+                .map(|ty| (*ty, ty.default_name().to_string()))
+                .collect(),
+        }
+    }
+}
+
 fn optional_rule<'i>(rule: Rule, pairs: &mut Pairs<'i, Rule>) -> Option<Pair<'i, Rule>> {
     match pairs.peek() {
         Some(ref p) if p.as_rule() == rule => pairs.next(),
@@ -97,19 +109,7 @@ pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
         .next()
         .ok_or_else(|| ParseError::invalid_state("non-empty parse result"))?;
 
-    let mut state = ParseState {
-        root_names: [
-            (bc::AccountType::Assets, "Assets".to_string()),
-            (bc::AccountType::Liabilities, "Liabilities".to_string()),
-            (bc::AccountType::Equity, "Equity".to_string()),
-            (bc::AccountType::Income, "Income".to_string()),
-            (bc::AccountType::Expenses, "Expenses".to_string()),
-        ]
-        .iter()
-        .cloned()
-        .collect(),
-    };
-
+    let mut state = ParseState::new();
     let mut directives = Vec::new();
 
     for directive_pair in parsed.into_inner() {
@@ -117,34 +117,15 @@ pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
             break;
         }
         let dir = directive(directive_pair, &state)?;
-        match dir {
-            bc::Directive::Option(ref opt) if opt.name == "name_assets" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Assets, opt.val.to_string());
+
+        // Change the root account names on such an option:
+        // option "name_assets" "Assets"
+        if let bc::Directive::Option(ref opt) = dir {
+            if let Some((account_type, account_name)) = opt.root_name_change() {
+                state.root_names.insert(account_type, account_name);
             }
-            bc::Directive::Option(ref opt) if opt.name == "name_liabilities" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Liabilities, opt.val.to_string());
-            }
-            bc::Directive::Option(ref opt) if opt.name == "name_equity" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Equity, opt.val.to_string());
-            }
-            bc::Directive::Option(ref opt) if opt.name == "name_income" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Income, opt.val.to_string());
-            }
-            bc::Directive::Option(ref opt) if opt.name == "name_expenses" => {
-                state
-                    .root_names
-                    .insert(bc::AccountType::Expenses, opt.val.to_string());
-            }
-            _ => {}
         }
+
         directives.push(dir);
     }
 
@@ -499,12 +480,12 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
     })
 }
 
-fn num_expr<'i>(pair: Pair<'i, Rule>) -> ParseResult<Decimal> {
+fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::num_expr);
     PREC_CLIMBER.climb(pair.into_inner(), term, reduce_num_expr)
 }
 
-fn term<'i>(pair: Pair<'i, Rule>) -> ParseResult<Decimal> {
+fn term(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::term);
     let span = pair.as_span();
     let mut term_parts = pair.into_inner();
@@ -583,7 +564,7 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
     let typ = inner.as_rule();
     for p in inner.into_inner() {
         match p.as_rule() {
-            Rule::date => date_ = Some(date(p)?.into()),
+            Rule::date => date_ = Some(date(p)?),
             Rule::quoted_str => label = Some(get_quoted_str(p)?),
             Rule::compound_amount => {
                 amount = compound_amount(p)?;
@@ -592,7 +573,7 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
         }
     }
     if typ == Rule::cost_spec_total {
-        if !amount.1.is_none() {
+        if amount.1.is_some() {
             panic!("Per-unit cost may not be specified using total cost");
         }
         amount = (None, amount.0, amount.2);
@@ -635,7 +616,7 @@ fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Acco
         .root_names
         .iter()
         .filter(|(_, ref v)| *v == first)
-        .map(|(k, _)| k.clone())
+        .map(|(k, _)| *k)
         .next()
         .ok_or_else(|| {
             pest::error::Error::new_from_span(
@@ -653,8 +634,8 @@ fn as_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
     Ok(pair.as_str())
 }
 
-fn date<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
-    Ok(pair.as_str())
+fn date<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Date<'i>> {
+    Ok(bc::Date::from_str_unchecked(pair.as_str()))
 }
 
 fn meta_kv<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::metadata::Meta<'i>> {
@@ -680,7 +661,7 @@ fn meta_kv_pair<'i>(
     let value = match value_pair.as_rule() {
         Rule::quoted_str => bc::metadata::MetaValue::Text(get_quoted_str(value_pair)?),
         Rule::account => bc::metadata::MetaValue::Account(account(value_pair, state)?),
-        Rule::date => bc::metadata::MetaValue::Date(date(value_pair)?.into()),
+        Rule::date => bc::metadata::MetaValue::Date(date(value_pair)?),
         Rule::commodity => bc::metadata::MetaValue::Currency(value_pair.as_str().into()),
         Rule::tag => bc::metadata::MetaValue::Tag((&value_pair.as_str()[1..]).into()),
         Rule::bool => bc::metadata::MetaValue::Bool(value_pair.as_str() == "true"),
@@ -702,7 +683,7 @@ fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<Cow<'i, str>> {
         .into())
 }
 
-fn flag<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Flag> {
+fn flag(pair: Pair<'_, Rule>) -> ParseResult<bc::Flag> {
     Ok(bc::Flag::from(pair.as_str()))
 }
 
@@ -1085,7 +1066,7 @@ mod tests {
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
-                        .date("2014-05-05".into())
+                        .date(bc::Date::from_str_unchecked("2014-05-05"))
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine".into())
                         .postings(vec![bc::Posting::builder()

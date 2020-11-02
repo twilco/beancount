@@ -126,6 +126,28 @@ pub struct BcOption<'a> {
     pub source: Option<&'a str>,
 }
 
+impl<'a> BcOption<'a> {
+    /// Determines if the current option specifies a root account name change.
+    /// For example, the following line will rename the 'Assets' root account to 'Activa':
+    /// ```beancount
+    /// option "name_assets" "Activa"
+    /// ```
+    ///
+    /// If this option is such a name change, this function will return the account type
+    /// and the new account name. Otherwise, it will return `None`.
+    pub fn root_name_change(&self) -> Option<(crate::AccountType, String)> {
+        use crate::AccountType::*;
+        match self.name.as_ref() {
+            "name_assets" => Some((Assets, self.val.to_string())),
+            "name_liabilities" => Some((Liabilities, self.val.to_string())),
+            "name_equity" => Some((Equity, self.val.to_string())),
+            "name_income" => Some((Income, self.val.to_string())),
+            "name_expenses" => Some((Expenses, self.val.to_string())),
+            _ => None,
+        }
+    }
+}
+
 /// Represents a `close` directive.  This directive signifies the closing of an account.
 ///
 /// The general format of the `close` directive is:

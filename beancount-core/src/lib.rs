@@ -22,7 +22,8 @@ pub mod position;
 pub mod posting;
 
 /// Represents the complete ledger consisting of a number of directives.
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
+// TODO: Derive Hash when possible
+#[derive(Clone, Debug, PartialEq, Default, TypedBuilder)]
 pub struct Ledger<'a> {
     pub directives: Vec<Directive<'a>>,
 }

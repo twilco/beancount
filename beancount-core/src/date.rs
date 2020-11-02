@@ -4,24 +4,36 @@ use std::{fmt, fmt::Display};
 #[cfg(feature = "chrono")]
 use chrono::NaiveDate;
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+/// Represents a beancount date. It can be created using the `from_*_unchecked` methods.
+/// Alternatively, with the `chrono` feature enabled, it can be converted from a `NaiveDate`.
+/// 
+/// # Example
+/// ```rust
+/// use beancount_core::Date;
+/// 
+/// // Create a Date from a String
+/// let past: Date<'static> = Date::from_str_unchecked("2020-01-01");
+/// let later: Date<'static> = Date::from_str_unchecked("43020-01-01");
+/// assert!(later > past);
+/// 
+/// // Create a Date from a chrono type.
+/// #[cfg(feature = "chrono")]
+/// let today: Date<'static> = chrono::Local::today().naive_local().into();
+/// ```
+#[derive(Eq, PartialEq, Debug, Clone, Ord, PartialOrd, Hash)]
 pub struct Date<'a>(Cow<'a, str>);
 
-impl<'a> From<Cow<'a, str>> for Date<'a> {
-    fn from(s: Cow<'a, str>) -> Self {
+impl Date<'_> {
+    pub fn from_str_unchecked(s: &str) -> Date<'_> {
+        Date(s.into())
+    }
+
+    pub fn from_string_unchecked(s: String) -> Date<'static> {
+        Date(s.into())
+    }
+
+    pub fn from_cow_unchecked(s: Cow<'_, str>) -> Date<'_> {
         Date(s)
-    }
-}
-
-impl<'a> From<&'a str> for Date<'a> {
-    fn from(s: &'a str) -> Self {
-        Date(Cow::from(s))
-    }
-}
-
-impl From<String> for Date<'_> {
-    fn from(s: String) -> Self {
-        Date(Cow::from(s))
     }
 }
 
@@ -40,7 +52,7 @@ impl Display for Date<'_> {
 #[cfg(feature = "chrono")]
 impl From<NaiveDate> for Date<'_> {
     fn from(d: NaiveDate) -> Self {
-        Cow::from(d.format("%Y-%m-%d").to_string()).into()
+        Date::from_string_unchecked(d.format("%Y-%m-%d").to_string())
     }
 }
 
@@ -49,6 +61,6 @@ impl From<NaiveDate> for Date<'_> {
 fn test_date_from_chrono() {
     assert_eq!(
         Date::from(chrono::NaiveDate::from_ymd(2020, 05, 05)),
-        Cow::from("2020-05-05").into()
+        Date::from_str_unchecked("2020-05-05")
     );
 }

@@ -45,7 +45,7 @@ impl fmt::Display for ParseError {
 
 impl Error for ParseError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source.as_ref().map(|x| &**x)
+        self.source.as_deref()
     }
 }
 
