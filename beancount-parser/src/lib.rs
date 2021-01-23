@@ -45,7 +45,7 @@ macro_rules! construct {
         construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
     ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident ?= $f:expr; $($rest:tt)* ) => {
-        let $builder = $builder.$field($pairs.next().map($f));
+        let $builder = $builder.$field($pairs.next().map($f).transpose()?);
         construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
     ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident := $val:expr; $($rest:tt)* ) => {
@@ -169,7 +169,7 @@ fn plugin_directive<'i>(directive: Pair<'i, Rule>) -> ParseResult<bc::Directive<
     Ok(bc::Directive::Plugin(construct! {
         bc::Plugin: directive => {
             module = get_quoted_str;
-            config = get_quoted_str;
+            config ?= get_quoted_str;
             source := Some(source);
         }
     }))
@@ -968,9 +968,40 @@ mod tests {
 
     #[test]
     fn plugin() {
+        parse_ok!(plugin, "plugin \"beancount.plugins.module_name\"\n");
         parse_ok!(
             plugin,
             "plugin \"beancount.plugins.module_name\" \"configuration data\"\n"
+        );
+
+        let source = indoc!(
+            "
+            plugin \"beancount.plugins.module_name\"
+            plugin \"beancount.plugins.module_name2\" \"config\"
+            "
+        );
+        assert_eq!(
+            parse(&source).unwrap(),
+            bc::Ledger {
+                directives: vec![
+                    bc::Directive::Plugin(
+                        bc::Plugin::builder()
+                            .module("beancount.plugins.module_name".into())
+                            .config(None)
+                            .source(Some("plugin \"beancount.plugins.module_name\"\n"))
+                            .build()
+                    ),
+                    bc::Directive::Plugin(
+                        bc::Plugin::builder()
+                            .module("beancount.plugins.module_name2".into())
+                            .config(Some("config".into()))
+                            .source(Some(
+                                "plugin \"beancount.plugins.module_name2\" \"config\"\n"
+                            ))
+                            .build()
+                    )
+                ]
+            }
         );
     }
 
