@@ -23,7 +23,7 @@ pub struct ParseError {
     pub kind: ParseErrorKind,
     /// The (line, column) location of the error in the input.
     pub location: (usize, usize),
-    source: Option<Box<dyn Error>>,
+    source: Option<Box<dyn Error + 'static + Send + Sync>>,
 }
 
 impl fmt::Display for ParseError {
@@ -45,7 +45,7 @@ impl fmt::Display for ParseError {
 
 impl Error for ParseError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source.as_deref()
+        self.source.as_ref().map(|e| e.as_ref() as &(dyn Error + 'static))
     }
 }
 
