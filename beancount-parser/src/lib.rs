@@ -1019,6 +1019,13 @@ mod tests {
     fn posting() {
         parse_ok!(posting, "Assets:Cash  200 USD");
         parse_ok!(posting, "Assets:Cash");
+        parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD }");
+        parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD, 2020-01-01 }");
+        parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD, 2020-01-01, \"abc\" }");
+        parse_ok!(posting, "Assets:Cash 200 XYZ { 200 # 10 USD }");
+        parse_ok!(posting, "Assets:Cash 200 XYZ {{ 200 USD }}");
+        parse_ok!(posting, "Assets:Cash 200 XYZ {}");
+        parse_ok!(posting, "Assets:Cash 200 XYZ {{}}");
     }
 
     #[test]
