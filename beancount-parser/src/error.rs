@@ -52,6 +52,16 @@ impl Error for ParseError {
 }
 
 impl ParseError {
+    pub(crate) fn invalid_input_with_span<T: ToString>(msg: T, span: Span) -> ParseError {
+        ParseError {
+            kind: ParseErrorKind::InvalidInput {
+                message: msg.to_string(),
+            },
+            location: span.start_pos().line_col(),
+            source: None,
+        }
+    }
+
     pub(crate) fn invalid_state<T: ToString>(msg: T) -> ParseError {
         ParseError {
             kind: ParseErrorKind::InvalidParserState {

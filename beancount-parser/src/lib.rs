@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 use lazy_static::lazy_static;
@@ -224,6 +225,16 @@ fn open_directive<'i>(
                 }
             } else {
                 Vec::new()
+            };
+            booking = if Rule::quoted_str {
+                |p: Pair<'i, _>| -> ParseResult<Option<bc::Booking>> {
+                    let span = p.as_span();
+                    bc::Booking::try_from(get_quoted_str(p)?.as_ref())
+                        .map_err(|_| ParseError::invalid_input_with_span(format!("unknown booking method {}", span.as_str()), span))
+                        .map(Some)
+                }
+            } else {
+                None
             };
             meta = |p| meta_kv(p, state);
             source := Some(source);
@@ -956,6 +967,10 @@ mod tests {
             open,
             "2014-05-01 open Liabilities:CreditCard:CapitalOne USD\n"
         );
+        parse_ok!(
+            open,
+            "2014-05-01 open Liabilities:CreditCard:CapitalOne USD \"STRICT\"\n"
+        );
     }
 
     #[test]
@@ -1026,7 +1041,10 @@ mod tests {
         parse_ok!(posting, "Assets:Cash");
         parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD }");
         parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD, 2020-01-01 }");
-        parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD, 2020-01-01, \"abc\" }");
+        parse_ok!(
+            posting,
+            "Assets:Cash 200 XYZ { 200 USD, 2020-01-01, \"abc\" }"
+        );
         parse_ok!(posting, "Assets:Cash 200 XYZ { 200 # 10 USD }");
         parse_ok!(posting, "Assets:Cash 200 XYZ { * }");
         parse_ok!(posting, "Assets:Cash 200 XYZ {{ 200 USD }}");

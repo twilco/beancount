@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
+use std::convert::TryFrom;
 
 use rust_decimal::Decimal;
 use typed_builder::TypedBuilder;
@@ -17,6 +18,10 @@ pub enum Booking {
     /// Reject ambiguous matches with an error.
     Strict,
 
+    /// Strict booking method, but disambiguate further with sizes. Reject ambiguous matches with
+    /// an error but if a lot matches the size exactly, accept it the oldest.
+    StrictWithSize,
+
     /// Disable matching and accept the creation of mixed inventories.
     None,
 
@@ -28,6 +33,22 @@ pub enum Booking {
 
     /// Last-in first-out in the case of ambiguity.
     Lifo,
+}
+
+impl<'a> TryFrom<&'a str> for Booking {
+    type Error = ();
+
+    fn try_from(val: &'a str) -> Result<Self, Self::Error> {
+        match val {
+            "STRICT" => Ok(Booking::Strict),
+            "STRICT_WITH_SIZE" => Ok(Booking::StrictWithSize),
+            "NONE" => Ok(Booking::None),
+            "AVERAGE" => Ok(Booking::Average),
+            "FIFO" => Ok(Booking::Fifo),
+            "LIFO" => Ok(Booking::Lifo),
+            _ => Err(()),
+        }
+    }
 }
 
 /// Enum of all directive types.
@@ -439,8 +460,8 @@ pub struct Open<'a> {
 
     /// Booking method. The default booking method for accounts is
     /// [`Booking::Strict`](enum.Booking.html).
-    #[builder(default=Booking::Strict)]
-    pub booking: Booking,
+    #[builder(default)]
+    pub booking: Option<Booking>,
 
     /// Metadata attached to the open directive.
     #[builder(default)]

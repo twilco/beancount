@@ -86,7 +86,7 @@ include = { "include" ~ quoted_str ~ eol }
 note = { date ~ "note" ~ account ~ quoted_str ~ eol_kv_list }
 
 // 2014-05-01 open Liabilities:CreditCard:CapitalOne USD
-open = { date ~ "open" ~ account ~ commodity_list? ~ eol_kv_list }
+open = { date ~ "open" ~ account ~ commodity_list? ~ quoted_str? ~ eol_kv_list }
 
 // option "title" "Ed’s Personal Ledger"
 option = { "option" ~ quoted_str ~ quoted_str ~ eol }

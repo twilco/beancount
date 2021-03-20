@@ -121,11 +121,13 @@ impl<'a, W: Write> Renderer<&'a Open<'_>, W> for BasicRenderer {
             write!(write, " {}", currency)?;
         }
         match open.booking {
-            Booking::Strict => write!(write, r#" "strict""#)?,
-            Booking::None => {}
-            Booking::Average => write!(write, r#" "average""#)?,
-            Booking::Fifo => write!(write, r#" "fifo""#)?,
-            Booking::Lifo => write!(write, r#" "lifo""#)?,
+            Some(Booking::Strict) => write!(write, r#" "STRICT""#)?,
+            Some(Booking::StrictWithSize) => write!(write, r#" "STRICT_WITH_SIZE""#)?,
+            Some(Booking::None) => write!(write, r#" "NONE""#)?,
+            Some(Booking::Average) => write!(write, r#" "AVERAGE""#)?,
+            Some(Booking::Fifo) => write!(write, r#" "FIFO""#)?,
+            Some(Booking::Lifo) => write!(write, r#" "LIFO""#)?,
+            None => {}
         };
         writeln!(write)?;
         render_key_value(self, write, &open.meta)?;
