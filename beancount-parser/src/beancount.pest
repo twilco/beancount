@@ -5,6 +5,7 @@ COMMENT = _{ ";" ~ (!NEWLINE ~ ANY)* }
 bool = @{ ^"true" | ^"false" }
 indent = _{ WHITESPACE+ }
 eol = _{ NEWLINE }
+asterisk = @{ "*" }
 key = @{ ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "-" | "_")+ }
 value = !{ quoted_str | account | date | commodity | tag | bool | amount | num_expr }
 key_value = ${ key ~ ":" ~ WHITESPACE* ~ value }
@@ -151,8 +152,7 @@ cost_spec_unit = { "{" ~ cost_comp_list? ~ "}" }
 cost_spec_total = { "{{" ~ cost_comp_list? ~ "}}" }
 // 502.12 # 9.95 USD, 2018-01-01, "hello there"
 cost_comp_list = _{ cost_comp ~ ("," ~ cost_comp)* }
-// TODO: Need to handle the asterisk case here.  https://bitbucket.org/blais/beancount/src/default/beancount/parser/grammar.y?fileviewer=file-view-default#grammar.y-669
-cost_comp = _{ date | quoted_str | compound_amount }
+cost_comp = _{ date | quoted_str | compound_amount | asterisk }
 compound_amount = {
     // e.g. 10 GOOG {502.12 # 9.95 USD}
     //               ^---------------^

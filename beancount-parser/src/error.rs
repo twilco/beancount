@@ -98,6 +98,7 @@ impl From<pest::error::Error<Rule>> for ParseError {
                 Rule::bool => "boolean value",
                 Rule::indent => "indentation",
                 Rule::eol => "end of line",
+                Rule::asterisk => "asterisk ('*')",
                 Rule::key => "key",
                 Rule::value => "value",
                 Rule::key_value => "key-value pair",

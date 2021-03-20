@@ -556,6 +556,7 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
     let mut amount = (None, None, None);
     let mut date_ = None;
     let mut label = None;
+    let mut merge = false;
     let span = pair.as_span();
     let inner = pair
         .into_inner()
@@ -568,6 +569,9 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
             Rule::quoted_str => label = Some(get_quoted_str(p)?),
             Rule::compound_amount => {
                 amount = compound_amount(p)?;
+            }
+            Rule::asterisk => {
+                merge = true;
             }
             _ => unimplemented!(),
         }
@@ -584,6 +588,7 @@ fn cost_spec<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::CostSpec<'i>> {
         .currency(amount.2)
         .date(date_)
         .label(label)
+        .merge_cost(merge)
         .build())
 }
 
@@ -1023,6 +1028,7 @@ mod tests {
         parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD, 2020-01-01 }");
         parse_ok!(posting, "Assets:Cash 200 XYZ { 200 USD, 2020-01-01, \"abc\" }");
         parse_ok!(posting, "Assets:Cash 200 XYZ { 200 # 10 USD }");
+        parse_ok!(posting, "Assets:Cash 200 XYZ { * }");
         parse_ok!(posting, "Assets:Cash 200 XYZ {{ 200 USD }}");
         parse_ok!(posting, "Assets:Cash 200 XYZ {}");
         parse_ok!(posting, "Assets:Cash 200 XYZ {{}}");
@@ -1096,7 +1102,7 @@ mod tests {
         let source = indoc!(
             "
             2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
-                Liabilities:CreditCard:CapitalOne         10 USD { 15 GBP } @ 20 GBP
+                Liabilities:CreditCard:CapitalOne         10 USD { 15 GBP, * } @ 20 GBP
             "
         );
         assert_eq!(
@@ -1124,6 +1130,7 @@ mod tests {
                                 bc::CostSpec::builder()
                                     .number_per(Some(15.into()))
                                     .currency(Some("GBP".into()))
+                                    .merge_cost(true)
                                     .build()
                             ))
                             .price(Some(

@@ -36,6 +36,9 @@ pub struct CostSpec<'a> {
     /// The label of the cost.
     #[builder(default)]
     pub label: Option<Cow<'a, str>>,
+    /// Flag to indicate that all lots should be merged and average cost to be used
+    #[builder(default)]
+    pub merge_cost: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, TypedBuilder)]
