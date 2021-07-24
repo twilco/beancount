@@ -82,11 +82,15 @@ lazy_static! {
 pub struct BeancountParser;
 
 #[derive(Debug)]
-struct ParseState {
+struct ParseState<'i> {
     root_names: HashMap<bc::AccountType, String>,
+
+    // Tags added via "pushtag" instruction. Use HashMap instead of HashSet because
+    // spec allows mutliple pushing of the same tag (ie requires an equal number of pops).
+    pushed_tags: HashMap<&'i str, u16>,
 }
 
-impl ParseState {
+impl<'i> ParseState<'i> {
     fn new() -> Self {
         use bc::AccountType::*;
         ParseState {
@@ -94,7 +98,33 @@ impl ParseState {
                 .iter()
                 .map(|ty| (*ty, ty.default_name().to_string()))
                 .collect(),
+            pushed_tags: HashMap::new(),
         }
+    }
+
+    fn push_tag(&mut self, tag: &'i str) {
+        if let Some(count) = self.pushed_tags.get_mut(tag) {
+            *count += 1;
+        } else {
+            self.pushed_tags.insert(tag, 1);
+        }
+    }
+
+    fn pop_tag(&mut self, tag: &str) -> Result<(), String> {
+        if let Some(count) = self.pushed_tags.get_mut(tag) {
+            if *count == 1 {
+                self.pushed_tags.remove(tag);
+            } else {
+                *count -= 1;
+            }
+            Ok(())
+        } else {
+            Err(format!("Attempting to pop absent tag: '{}'", tag))
+        }
+    }
+
+    fn get_tags(&self) -> impl Iterator<Item = &&str> {
+        self.pushed_tags.keys()
     }
 }
 
@@ -114,23 +144,55 @@ pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
     let mut directives = Vec::new();
 
     for directive_pair in parsed.into_inner() {
-        if directive_pair.as_rule() == Rule::EOI {
-            break;
-        }
-        let dir = directive(directive_pair, &state)?;
+        match directive_pair.as_rule() {
+            Rule::EOI => {
+                let unpopped = state
+                    .get_tags()
+                    .map(|s| format!("'{}'", s))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                if !unpopped.is_empty() {
+                    return Err(ParseError::invalid_input_with_span(
+                        format!("Unbalanced pushed tag(s): {}", unpopped),
+                        directive_pair.as_span(),
+                    ));
+                }
+                break;
+            }
+            Rule::pushtag => {
+                state.push_tag(extract_tag(directive_pair)?);
+            }
+            Rule::poptag => {
+                let span = directive_pair.as_span();
+                if let Err(msg) = state.pop_tag(extract_tag(directive_pair)?) {
+                    return Err(ParseError::invalid_input_with_span(msg, span));
+                }
+            }
+            _ => {
+                let dir = directive(directive_pair, &state)?;
 
-        // Change the root account names on such an option:
-        // option "name_assets" "Assets"
-        if let bc::Directive::Option(ref opt) = dir {
-            if let Some((account_type, account_name)) = opt.root_name_change() {
-                state.root_names.insert(account_type, account_name);
+                // Change the root account names on such an option:
+                // option "name_assets" "Assets"
+                if let bc::Directive::Option(ref opt) = dir {
+                    if let Some((account_type, account_name)) = opt.root_name_change() {
+                        state.root_names.insert(account_type, account_name);
+                    }
+                }
+
+                directives.push(dir);
             }
         }
-
-        directives.push(dir);
     }
 
     Ok(bc::Ledger::builder().directives(directives).build())
+}
+
+fn extract_tag<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
+    let mut pairs = pair.into_inner();
+    let pair = pairs
+        .next()
+        .ok_or_else(|| ParseError::invalid_state("tag"))?;
+    Ok(&pair.as_str()[1..])
 }
 
 fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Directive<'i>> {
@@ -422,6 +484,9 @@ fn transaction_directive<'i>(
                             unimplemented!("rule {:?}", rule);
                         }
                     }
+                }
+                for t in state.get_tags() {
+                  tx_tags.insert(Cow::from((*t).to_owned()));
                 }
                 (tx_meta, tx_tags, tx_links, postings)
             };
@@ -1050,6 +1115,24 @@ mod tests {
         parse_ok!(posting, "Assets:Cash 200 XYZ {{ 200 USD }}");
         parse_ok!(posting, "Assets:Cash 200 XYZ {}");
         parse_ok!(posting, "Assets:Cash 200 XYZ {{}}");
+    }
+
+    #[test]
+    fn pushtag() {
+        parse_ok!(pushtag, "pushtag #sometag\n");
+        parse_ok!(pushtag, "pushtag    #sometag\n");
+        parse_ok!(pushtag, "pushtag   #sometag  \n");
+        parse_fail!(pushtag, "pushtag\n");
+        parse_fail!(pushtag, "pushtag #goodtag #badtag\n");
+    }
+
+    #[test]
+    fn poptag() {
+        parse_ok!(poptag, "poptag #sometag\n");
+        parse_ok!(poptag, "poptag    #sometag\n");
+        parse_ok!(poptag, "poptag   #sometag  \n");
+        parse_fail!(poptag, "poptag\n");
+        parse_fail!(poptag, "poptag #goodtag #badtag\n");
     }
 
     #[test]

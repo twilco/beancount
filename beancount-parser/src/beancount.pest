@@ -104,6 +104,12 @@ price = { date ~ "price" ~ commodity ~ amount ~ eol_kv_list }
 //   SELECT account, sum(position) WHERE ‘trip-france-2014’ in tags"
 query = { date ~ "query" ~ quoted_str ~ quoted_str ~ eol_kv_list }
 
+// pushtag #trip-to-peru
+pushtag = { "pushtag" ~ tag ~ eol }
+
+// poptag #trip-to-peru
+poptag = { "poptag" ~ tag ~ eol }
+
 //// Transaction directive
 
 // 2014-05-05 txn "Cafe Mogador" "Lamb tagine with wine"
@@ -163,4 +169,4 @@ compound_amount = {
     num_expr ~ commodity?
 }
 
-file = { SOI ~ (org_mode_title | option | plugin | custom | document | commodity_directive | balance | event | include | note | open | close | pad | price | query | transaction | eol)* ~ EOI}
+file = { SOI ~ (org_mode_title | option | plugin | custom | document | commodity_directive | balance | event | include | note | open | close | pad | price | query | transaction | pushtag | poptag | eol)* ~ EOI}

@@ -164,6 +164,8 @@ impl From<pest::error::Error<Rule>> for ParseError {
                 Rule::plugin => "plugin directive",
                 Rule::price => "price directive",
                 Rule::query => "query directive",
+                Rule::pushtag => "pushtag",
+                Rule::poptag => "poptag",
                 Rule::transaction => "transaction directive",
                 Rule::txn_flag => "transaction flag",
                 Rule::flag_okay => "'txn' or '*'",
