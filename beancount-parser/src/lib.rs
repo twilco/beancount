@@ -1136,6 +1136,63 @@ mod tests {
     }
 
     #[test]
+    fn test_push() {
+        let mut state = ParseState::new();
+        state.push_tag("sometag");
+        assert_eq!(1, state.pushed_tags.len());
+        assert_eq!(Some(&1), state.pushed_tags.get("sometag"));
+        state.push_tag("othertag");
+        assert_eq!(2, state.pushed_tags.len());
+        assert_eq!(Some(&1), state.pushed_tags.get("othertag"));
+        assert_eq!(Some(&1), state.pushed_tags.get("sometag"));
+        state.push_tag("sometag");
+        assert_eq!(2, state.pushed_tags.len());
+        assert_eq!(Some(&2), state.pushed_tags.get("sometag"));
+    }
+
+    #[test]
+    fn test_pop() {
+        let mut state = ParseState::new();
+        assert!(state.pop_tag("sometag").is_err());
+        state.push_tag("sometag");
+        state.push_tag("sometag");
+        assert_eq!(1, state.pushed_tags.len());
+        assert_eq!(Some(&2), state.pushed_tags.get("sometag"));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(1, state.pushed_tags.len());
+        assert_eq!(Some(&1), state.pushed_tags.get("sometag"));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(0, state.pushed_tags.len());
+        assert_eq!(None, state.pushed_tags.get("sometag"));
+    }
+
+    fn get_sorted_tags<'a>(state: &'a ParseState) -> Vec<&'a str> {
+        let mut tags = state.get_tags().map(|a| *a).collect::<Vec<&'a str>>();
+        tags.sort();
+        tags
+    }
+
+    #[test]
+    fn test_iter() {
+        let mut state = ParseState::new();
+
+        assert!(get_sorted_tags(&state).is_empty());
+        state.push_tag("sometag");
+        assert_eq!(vec!["sometag"], get_sorted_tags(&state));
+        state.push_tag("sometag");
+        assert_eq!(vec!["sometag"], get_sorted_tags(&state));
+        state.push_tag("othertag");
+        assert_eq!(vec!["othertag", "sometag"], get_sorted_tags(&state));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(vec!["othertag", "sometag"], get_sorted_tags(&state));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(vec!["othertag"], get_sorted_tags(&state));
+        assert!(state.pop_tag("othertag").is_ok());
+        assert!(get_sorted_tags(&state).is_empty());
+        assert!(state.pop_tag("othertag").is_err());
+    }
+
+    #[test]
     fn transaction() {
         parse_ok!(
             transaction,
