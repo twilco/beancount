@@ -82,11 +82,17 @@ lazy_static! {
 pub struct BeancountParser;
 
 #[derive(Debug)]
-struct ParseState {
+struct ParseState<'i> {
     root_names: HashMap<bc::AccountType, String>,
+
+    // Track pushed tag count with HashMap<&str, u64> instead of only tracking
+    // tags with HashSet<&str> because the spec allows pushing multiple of the
+    // same tag, and conformance with bean-check requires an equal number of
+    // pops.
+    pushed_tags: HashMap<&'i str, u16>,
 }
 
-impl ParseState {
+impl<'i> ParseState<'i> {
     fn new() -> Self {
         use bc::AccountType::*;
         ParseState {
@@ -94,7 +100,30 @@ impl ParseState {
                 .iter()
                 .map(|ty| (*ty, ty.default_name().to_string()))
                 .collect(),
+            pushed_tags: HashMap::new(),
         }
+    }
+
+    fn push_tag(&mut self, tag: &'i str) {
+        *self.pushed_tags.entry(tag).or_insert(0) += 1;
+    }
+
+    fn pop_tag(&mut self, tag: &str) -> Result<(), String> {
+        match self.pushed_tags.get_mut(tag) {
+            Some(count) => {
+                if *count <= 1 {
+                    self.pushed_tags.remove(tag);
+                } else {
+                    *count -= 1;
+                }
+                Ok(())
+            }
+            _ => Err(format!("Attempting to pop absent tag: '{}'", tag)),
+        }
+    }
+
+    fn get_pushed_tags(&self) -> impl Iterator<Item = &&str> {
+        self.pushed_tags.keys()
     }
 }
 
@@ -114,23 +143,55 @@ pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
     let mut directives = Vec::new();
 
     for directive_pair in parsed.into_inner() {
-        if directive_pair.as_rule() == Rule::EOI {
-            break;
-        }
-        let dir = directive(directive_pair, &state)?;
+        match directive_pair.as_rule() {
+            Rule::EOI => {
+                let pushed_tags = state
+                    .get_pushed_tags()
+                    .map(|s| format!("'{}'", s))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                if !pushed_tags.is_empty() {
+                    return Err(ParseError::invalid_input_with_span(
+                        format!("Unbalanced pushed tag(s): {}", pushed_tags),
+                        directive_pair.as_span(),
+                    ));
+                }
+                break;
+            }
+            Rule::pushtag => {
+                state.push_tag(extract_tag(directive_pair)?);
+            }
+            Rule::poptag => {
+                let span = directive_pair.as_span();
+                if let Err(msg) = state.pop_tag(extract_tag(directive_pair)?) {
+                    return Err(ParseError::invalid_input_with_span(msg, span));
+                }
+            }
+            _ => {
+                let dir = directive(directive_pair, &state)?;
 
-        // Change the root account names on such an option:
-        // option "name_assets" "Assets"
-        if let bc::Directive::Option(ref opt) = dir {
-            if let Some((account_type, account_name)) = opt.root_name_change() {
-                state.root_names.insert(account_type, account_name);
+                // Change the root account names on such an option:
+                // option "name_assets" "Assets"
+                if let bc::Directive::Option(ref opt) = dir {
+                    if let Some((account_type, account_name)) = opt.root_name_change() {
+                        state.root_names.insert(account_type, account_name);
+                    }
+                }
+
+                directives.push(dir);
             }
         }
-
-        directives.push(dir);
     }
 
     Ok(bc::Ledger::builder().directives(directives).build())
+}
+
+fn extract_tag<'i>(pair: Pair<'i, Rule>) -> ParseResult<&'i str> {
+    let mut pairs = pair.into_inner();
+    let pair = pairs
+        .next()
+        .ok_or_else(|| ParseError::invalid_state("tag"))?;
+    Ok(&pair.as_str()[1..])
 }
 
 fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Directive<'i>> {
@@ -422,6 +483,9 @@ fn transaction_directive<'i>(
                             unimplemented!("rule {:?}", rule);
                         }
                     }
+                }
+                for tag in state.get_pushed_tags() {
+                  tx_tags.insert(Cow::from((*tag).to_owned()));
                 }
                 (tx_meta, tx_tags, tx_links, postings)
             };
@@ -732,6 +796,7 @@ fn compound_amount<'i>(
 mod tests {
     use super::*;
     use crate::bc;
+    use bc::metadata::Tag;
     use indoc::indoc;
     use pest::Parser;
 
@@ -1050,6 +1115,209 @@ mod tests {
         parse_ok!(posting, "Assets:Cash 200 XYZ {{ 200 USD }}");
         parse_ok!(posting, "Assets:Cash 200 XYZ {}");
         parse_ok!(posting, "Assets:Cash 200 XYZ {{}}");
+    }
+
+    #[test]
+    fn pushtag() {
+        parse_ok!(pushtag, "pushtag #sometag\n");
+        parse_ok!(pushtag, "pushtag    #sometag\n");
+        parse_ok!(pushtag, "pushtag   #sometag  \n");
+        parse_fail!(pushtag, "pushtag\n");
+        parse_fail!(pushtag, "pushtag #goodtag #badtag\n");
+    }
+
+    #[test]
+    fn poptag() {
+        parse_ok!(poptag, "poptag #sometag\n");
+        parse_ok!(poptag, "poptag    #sometag\n");
+        parse_ok!(poptag, "poptag   #sometag  \n");
+        parse_fail!(poptag, "poptag\n");
+        parse_fail!(poptag, "poptag #goodtag #badtag\n");
+    }
+
+    #[test]
+    fn test_push() {
+        let mut state = ParseState::new();
+        state.push_tag("sometag");
+        assert_eq!(1, state.pushed_tags.len());
+        assert_eq!(Some(&1), state.pushed_tags.get("sometag"));
+        state.push_tag("othertag");
+        assert_eq!(2, state.pushed_tags.len());
+        assert_eq!(Some(&1), state.pushed_tags.get("othertag"));
+        assert_eq!(Some(&1), state.pushed_tags.get("sometag"));
+        state.push_tag("sometag");
+        assert_eq!(2, state.pushed_tags.len());
+        assert_eq!(Some(&2), state.pushed_tags.get("sometag"));
+    }
+
+    #[test]
+    fn test_pop() {
+        let mut state = ParseState::new();
+        assert!(state.pop_tag("sometag").is_err());
+        state.push_tag("sometag");
+        state.push_tag("sometag");
+        assert_eq!(1, state.pushed_tags.len());
+        assert_eq!(Some(&2), state.pushed_tags.get("sometag"));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(1, state.pushed_tags.len());
+        assert_eq!(Some(&1), state.pushed_tags.get("sometag"));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(0, state.pushed_tags.len());
+        assert_eq!(None, state.pushed_tags.get("sometag"));
+    }
+
+    fn get_sorted_tags<'a>(state: &'a ParseState) -> Vec<&'a str> {
+        let mut tags = state
+            .get_pushed_tags()
+            .map(|a| *a)
+            .collect::<Vec<&'a str>>();
+        tags.sort();
+        tags
+    }
+
+    #[test]
+    fn test_iter() {
+        let mut state = ParseState::new();
+
+        assert!(get_sorted_tags(&state).is_empty());
+        state.push_tag("sometag");
+        assert_eq!(vec!["sometag"], get_sorted_tags(&state));
+        state.push_tag("sometag");
+        assert_eq!(vec!["sometag"], get_sorted_tags(&state));
+        state.push_tag("othertag");
+        assert_eq!(vec!["othertag", "sometag"], get_sorted_tags(&state));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(vec!["othertag", "sometag"], get_sorted_tags(&state));
+        assert!(state.pop_tag("sometag").is_ok());
+        assert_eq!(vec!["othertag"], get_sorted_tags(&state));
+        assert!(state.pop_tag("othertag").is_ok());
+        assert!(get_sorted_tags(&state).is_empty());
+        assert!(state.pop_tag("othertag").is_err());
+    }
+
+    #[test]
+    fn test_parsing_push_and_pop() {
+        let source = indoc!(
+            "
+            pushtag #social
+            "
+        );
+        assert!(parse(&source).is_err());
+
+        let source = indoc!(
+            "
+            poptag #social
+            "
+        );
+        assert!(parse(&source).is_err());
+
+        let source = indoc!(
+            "
+            pushtag #social
+            poptag #social
+            "
+        );
+        assert!(parse(&source).is_ok());
+
+        let source = indoc!(
+            "
+            pushtag #rust-is-cool
+            pushtag #social
+            poptag #social
+            poptag #rust-is-cool
+
+            pushtag #rust-is-cool
+            pushtag #social
+            poptag #rust-is-cool
+            poptag #social
+            "
+        );
+        assert!(parse(&source).is_ok());
+        let source = indoc!(
+            "
+            pushtag #rust-is-cool
+            pushtag #social
+            poptag #social
+            "
+        );
+        assert!(parse(&source).is_err());
+    }
+
+    #[test]
+    fn test_pushed_tags_added_to_transaction() {
+        let pre_source = indoc!(
+            "
+            pushtag #social
+            pushtag #alcohol
+            pushtag #not-included
+            poptag #not-included
+            "
+        );
+
+        let post_source = indoc!(
+            "
+            poptag #social
+            poptag #alcohol
+            pushtag #also-not-included
+            poptag #also-not-included
+            "
+        );
+
+        let txn_source = indoc!(
+            "
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+                Liabilities:CreditCard:CapitalOne         10 USD { 15 GBP, * } @ 20 GBP
+            "
+        );
+
+        let source = pre_source.to_owned() + txn_source + post_source;
+
+        assert_eq!(
+            parse(&source).unwrap(),
+            bc::Ledger {
+                directives: vec![bc::Directive::Transaction(
+                    bc::Transaction::builder()
+                        .date(bc::Date::from_str_unchecked("2014-05-05"))
+                        .payee(Some("Cafe Mogador".into()))
+                        .narration("Lamb tagine with wine".into())
+                        .postings(vec![bc::Posting::builder()
+                            .account(
+                                bc::Account::builder()
+                                    .ty(bc::AccountType::Liabilities)
+                                    .parts(vec!["CreditCard".into(), "CapitalOne".into()])
+                                    .build()
+                            )
+                            .units(
+                                bc::IncompleteAmount::builder()
+                                    .num(Some(10.into()))
+                                    .currency(Some("USD".into()))
+                                    .build()
+                            )
+                            .cost(Some(
+                                bc::CostSpec::builder()
+                                    .number_per(Some(15.into()))
+                                    .currency(Some("GBP".into()))
+                                    .merge_cost(true)
+                                    .build()
+                            ))
+                            .price(Some(
+                                bc::IncompleteAmount::builder()
+                                    .num(Some(20.into()))
+                                    .currency(Some("GBP".into()))
+                                    .build()
+                            ))
+                            .build()])
+                        .tags(
+                            vec!["social", "alcohol"]
+                                .iter()
+                                .map(|a| Cow::from(*a))
+                                .collect::<HashSet<Tag<'_>>>()
+                        )
+                        .source(Some(txn_source))
+                        .build()
+                )]
+            }
+        )
     }
 
     #[test]
