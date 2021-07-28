@@ -45,6 +45,17 @@ macro_rules! construct {
         let $pat = $block;
         construct!(@fields, $builder, $span, $pairs, $($rest)*)
     };
+    ( @fields, $builder:ident, $span:ident, $pairs:ident, let $pat:pat = from $name:ident if $rule:path $then:block else $else:block; $($rest:tt)* ) => {
+        let $pat = match $pairs.peek() {
+            Some(ref p) if p.as_rule() == $rule => {
+                let $name = $pairs.next()
+                    .ok_or_else(|| ParseError::invalid_state_with_span(stringify!($field), $span.clone()))?;
+                $then
+            },
+            _ => $else,
+        };
+        construct!(@fields, $builder, $span, $pairs, $($rest)*)
+    };
     ( @fields, $builder:ident, $span:ident, $pairs:ident, $field:ident ?= $f:expr; $($rest:tt)* ) => {
         let $builder = $builder.$field($pairs.next().map($f).transpose()?);
         construct!(@fields, $builder, $span, $pairs, $($rest)*)
@@ -407,6 +418,13 @@ fn document_directive<'i>(
             date = date;
             account = |p| account(p, state);
             path = get_quoted_str;
+            let (tags, links) = from pair if Rule::tags_links {
+                tags_links(pair)?
+            } else {
+                (HashSet::new(), HashSet::new())
+            };
+            tags := tags;
+            links := links;
             meta = |p| meta_kv(p, state);
             source := Some(source);
         }
@@ -453,11 +471,14 @@ fn transaction_directive<'i>(
             };
             payee := payee;
             narration := narration;
-            let (meta, tags, links, postings) = from pair {
+            let (mut tags, mut links) = from pair if Rule::tags_links {
+                tags_links(pair)?
+            } else {
+                (HashSet::new(), HashSet::new())
+            };
+            let (meta, postings) = from pair {
                 let mut postings: Vec<bc::Posting<'i>> = Vec::new();
                 let mut tx_meta = bc::metadata::Meta::new();
-                let mut tx_tags = HashSet::new();
-                let mut tx_links = HashSet::new();
                 for p in pair.into_inner() {
                     match p.as_rule() {
                         Rule::posting => {
@@ -473,11 +494,11 @@ fn transaction_directive<'i>(
                         }
                         Rule::tag => {
                             let tag = (&p.as_str()[1..]).into();
-                            tx_tags.insert(tag);
+                            tags.insert(tag);
                         }
                         Rule::link => {
                             let link = (&p.as_str()[1..]).into();
-                            tx_links.insert(link);
+                            links.insert(link);
                         }
                         rule => {
                             unimplemented!("rule {:?}", rule);
@@ -485,9 +506,9 @@ fn transaction_directive<'i>(
                     }
                 }
                 for tag in state.get_pushed_tags() {
-                  tx_tags.insert(Cow::from((*tag).to_owned()));
+                  tags.insert(Cow::from((*tag).to_owned()));
                 }
-                (tx_meta, tx_tags, tx_links, postings)
+                (tx_meta, postings)
             };
             postings := postings;
             meta := meta;
@@ -723,6 +744,31 @@ fn meta_kv<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::meta
     pair.into_inner().map(|p| meta_kv_pair(p, state)).collect()
 }
 
+fn tags_links<'i>(
+    pair: Pair<'i, Rule>,
+) -> ParseResult<(
+    HashSet<bc::metadata::Tag<'i>>,
+    HashSet<bc::metadata::Link<'i>>,
+)> {
+    let (mut tags, mut links) = (HashSet::new(), HashSet::new());
+    for p in pair.into_inner() {
+        match p.as_rule() {
+            Rule::tag => {
+                let tag = (&p.as_str()[1..]).into();
+                tags.insert(tag);
+            }
+            Rule::link => {
+                let link = (&p.as_str()[1..]).into();
+                links.insert(link);
+            }
+            rule => {
+                unimplemented!("rule {:?}", rule);
+            }
+        }
+    }
+    Ok((tags, links))
+}
+
 fn meta_kv_pair<'i>(
     pair: Pair<'i, Rule>,
     state: &ParseState,
@@ -796,7 +842,7 @@ fn compound_amount<'i>(
 mod tests {
     use super::*;
     use crate::bc;
-    use bc::metadata::Tag;
+    use bc::metadata::{Link, Tag};
     use indoc::indoc;
     use pest::Parser;
 
@@ -1005,6 +1051,19 @@ mod tests {
         parse_ok!(
             document,
             "2013-11-03 document Liabilities:CreditCard \"/home/joe/stmts/apr-2014.pdf\"\n"
+        );
+        parse_ok!(
+            document,
+            "2013-11-03 document Liabilities:CreditCard \"/home/joe/stmts/apr-2014.pdf\" #tag ^link\n"
+        );
+        parse_ok!(
+            document,
+            indoc!(
+                "
+                2013-11-03 document Liabilities:CreditCard \"/home/joe/stmts/apr-2014.pdf\" #tag ^link
+                    meta: 123
+                "
+            )
         );
     }
 
@@ -1387,7 +1446,7 @@ mod tests {
 
         let source = indoc!(
             "
-            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\"
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\" #tag ^link
                 Liabilities:CreditCard:CapitalOne         10 USD { 15 GBP, * } @ 20 GBP
             "
         );
@@ -1399,6 +1458,18 @@ mod tests {
                         .date(bc::Date::from_str_unchecked("2014-05-05"))
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine".into())
+                        .tags(
+                            vec!["tag"]
+                                .iter()
+                                .map(|a| Cow::from(*a))
+                                .collect::<HashSet<Tag<'_>>>()
+                        )
+                        .links(
+                            vec!["link"]
+                                .iter()
+                                .map(|a| Cow::from(*a))
+                                .collect::<HashSet<Tag<'_>>>()
+                        )
                         .postings(vec![bc::Posting::builder()
                             .account(
                                 bc::Account::builder()
