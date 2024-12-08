@@ -541,29 +541,8 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
         .map(price_annotation)
         .transpose()?;
     let price = match (price_anno, units.num) {
-        (
-            Some((
-                true,
-                bc::IncompleteAmount {
-                    num: Some(n),
-                    currency,
-                },
-            )),
-            Some(n_units),
-        ) => {
-            let num = if n_units.is_zero() {
-                0.into()
-            } else {
-                n / n_units.abs()
-            };
-            Some(
-                bc::IncompleteAmount::builder()
-                    .num(Some(num))
-                    .currency(currency)
-                    .build(),
-            )
-        }
-        (Some((_, p)), _) => Some(p),
+        (Some((true, p)), _) => Some(bc::PriceSpec::Total(p)),
+        (Some((false, p)), _) => Some(bc::PriceSpec::PerUnit(p)),
         (None, _) => None,
     };
     Ok(bc::Posting {
@@ -1359,12 +1338,12 @@ mod tests {
                                     .merge_cost(true)
                                     .build()
                             ))
-                            .price(Some(
+                            .price(Some(bc::PriceSpec::PerUnit(
                                 bc::IncompleteAmount::builder()
                                     .num(Some(20.into()))
                                     .currency(Some("GBP".into()))
                                     .build()
-                            ))
+                            )))
                             .build()])
                         .tags(
                             vec!["social", "alcohol"]
@@ -1490,12 +1469,71 @@ mod tests {
                                     .merge_cost(true)
                                     .build()
                             ))
-                            .price(Some(
+                            .price(Some(bc::PriceSpec::PerUnit(
                                 bc::IncompleteAmount::builder()
                                     .num(Some(20.into()))
                                     .currency(Some("GBP".into()))
                                     .build()
+                            )))
+                            .build()])
+                        .source(Some(source))
+                        .build()
+                )]
+            }
+        );
+
+        let source = indoc!(
+            "
+            2014-05-05 txn \"Cafe Mogador\" \"Lamb tagine with wine\" #tag ^link
+                Liabilities:CreditCard:CapitalOne         10 USD { 15 GBP, * } @@ 20 GBP
+            "
+        );
+        assert_eq!(
+            parse(&source).unwrap(),
+            bc::Ledger {
+                directives: vec![bc::Directive::Transaction(
+                    bc::Transaction::builder()
+                        .date(bc::Date::from_str_unchecked("2014-05-05"))
+                        .payee(Some("Cafe Mogador".into()))
+                        .narration("Lamb tagine with wine".into())
+                        .tags(
+                            vec!["tag"]
+                                .iter()
+                                .map(|a| Cow::from(*a))
+                                .collect::<HashSet<Tag<'_>>>()
+                        )
+                        .links(
+                            vec!["link"]
+                                .iter()
+                                .map(|a| Cow::from(*a))
+                                .collect::<HashSet<Tag<'_>>>()
+                        )
+                        .postings(vec![bc::Posting::builder()
+                            .account(
+                                bc::Account::builder()
+                                    .ty(bc::AccountType::Liabilities)
+                                    .parts(vec!["CreditCard".into(), "CapitalOne".into()])
+                                    .build()
+                            )
+                            .units(
+                                bc::IncompleteAmount::builder()
+                                    .num(Some(10.into()))
+                                    .currency(Some("USD".into()))
+                                    .build()
+                            )
+                            .cost(Some(
+                                bc::CostSpec::builder()
+                                    .number_per(Some(15.into()))
+                                    .currency(Some("GBP".into()))
+                                    .merge_cost(true)
+                                    .build()
                             ))
+                            .price(Some(bc::PriceSpec::Total(
+                                bc::IncompleteAmount::builder()
+                                    .num(Some(20.into()))
+                                    .currency(Some("GBP".into()))
+                                    .build()
+                            )))
                             .build()])
                         .source(Some(source))
                         .build()

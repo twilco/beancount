@@ -324,7 +324,7 @@ impl<'a, W: Write> Renderer<&'a Posting<'_>, W> for BasicRenderer {
             self.render(cost, w)?;
         }
         if let Some(price) = &posting.price {
-            write!(w, " @ ")?;
+            write!(w, " ")?;
             self.render(price, w)?;
         }
         writeln!(w)?;
@@ -371,6 +371,23 @@ impl<'a, W: Write> Renderer<&'a CostSpec<'_>, W> for BasicRenderer {
             write!(w, "}}")?;
         }
         Ok(())
+    }
+}
+
+impl<'a, W: Write> Renderer<&'a PriceSpec<'_>, W> for BasicRenderer {
+    type Error = BasicRendererError;
+    fn render(&self, price: &'a PriceSpec<'_>, w: &mut W) -> Result<(), Self::Error> {
+        let amount = match price {
+            PriceSpec::PerUnit(amount) => {
+                write!(w, "@ ")?;
+                amount
+            }
+            PriceSpec::Total(amount) => {
+                write!(w, "@@ ")?;
+                amount
+            }
+        };
+        self.render(amount, w)
     }
 }
 
