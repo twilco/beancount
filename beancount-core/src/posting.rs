@@ -41,11 +41,17 @@ pub struct Posting<'a> {
 
     /// The price of this posting.
     #[builder(default)]
-    pub price: Option<IncompleteAmount<'a>>,
+    pub price: Option<PriceSpec<'a>>,
 
     #[builder(default)]
     pub flag: Option<Flag<'a>>,
 
     #[builder(default)]
     pub meta: Meta<'a>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum PriceSpec<'a> {
+    PerUnit(IncompleteAmount<'a>),
+    Total(IncompleteAmount<'a>),
 }

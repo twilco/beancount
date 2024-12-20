@@ -10,6 +10,7 @@ pub use directives::*;
 pub use flags::Flag;
 pub use position::CostSpec;
 pub use posting::Posting;
+pub use posting::PriceSpec;
 
 pub mod account;
 pub mod account_types;
