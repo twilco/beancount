@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal;
 
 /// Metadata that can be attached to other Beancount information.
 pub type Meta<'a> = HashMap<Cow<'a, str>, MetaValue<'a>>;
@@ -17,7 +17,7 @@ pub enum MetaValue<'a> {
     Tag(Tag<'a>),
     Bool(bool),
     Amount(super::amount::Amount<'a>),
-    Number(Decimal),
+    Number(BigDecimal),
 }
 
 /// Tag associated with a transaction directive.  Tags allow you to mark a subset of transactions,

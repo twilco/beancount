@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal;
 use typed_builder::TypedBuilder;
 
 use super::amount::Amount;
@@ -8,7 +8,7 @@ use super::{Currency, Date};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, TypedBuilder)]
 pub struct Cost<'a> {
-    pub number: Decimal,
+    pub number: BigDecimal,
     pub currency: Currency<'a>,
     pub date: Date<'a>,
     pub label: Option<Cow<'a, str>>,
@@ -24,9 +24,9 @@ pub struct Cost<'a> {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, TypedBuilder)]
 pub struct CostSpec<'a> {
     #[builder(default)]
-    pub number_per: Option<Decimal>,
+    pub number_per: Option<BigDecimal>,
     #[builder(default)]
-    pub number_total: Option<Decimal>,
+    pub number_total: Option<BigDecimal>,
     /// The type of commodity for this cost.
     #[builder(default)]
     pub currency: Option<Currency<'a>>,

@@ -8,7 +8,7 @@ use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::{Assoc, Op, PrattParser};
 use pest::Parser;
 use pest_derive::Parser as PestParser;
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal;
 
 use beancount_core as bc;
 
@@ -539,10 +539,10 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
     let price_anno = optional_rule(Rule::price_annotation, &mut inner)
         .map(price_annotation)
         .transpose()?;
-    let price = match (price_anno, units.num) {
-        (Some((true, p)), _) => Some(bc::PriceSpec::Total(p)),
-        (Some((false, p)), _) => Some(bc::PriceSpec::PerUnit(p)),
-        (None, _) => None,
+    let price = match price_anno {
+        Some((true, p)) => Some(bc::PriceSpec::Total(p)),
+        Some((false, p)) => Some(bc::PriceSpec::PerUnit(p)),
+        None => None,
     };
     Ok(bc::Posting {
         flag,
@@ -554,19 +554,19 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
     })
 }
 
-fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
+fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<BigDecimal> {
     debug_assert!(pair.as_rule() == Rule::num_expr);
     //PRATT_PARSER.climb(pair.into_inner(), term, reduce_num_expr)
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
             Rule::num => {
                 let s = primary.as_str().replace(',', "");
-                Decimal::from_str(&s).map_err(|e| ParseError::decimal_parse_error(e, primary.as_span()))
+                BigDecimal::from_str(&s).map_err(|e| ParseError::decimal_parse_error(e, primary.as_span()))
             }
             _ => unreachable!(),
         })
         .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::neg => rhs.map(|mut v| { v.set_sign_positive(!v.is_sign_positive()); v }),
+            Rule::neg => rhs.map(|v| -v),
             Rule::pos => rhs,
             _ => unreachable!(),
         })
@@ -780,7 +780,7 @@ fn flag(pair: Pair<'_, Rule>) -> ParseResult<bc::Flag> {
 
 fn compound_amount<'i>(
     pair: Pair<'i, Rule>,
-) -> ParseResult<(Option<Decimal>, Option<Decimal>, Option<Cow<'i, str>>)> {
+) -> ParseResult<(Option<BigDecimal>, Option<BigDecimal>, Option<Cow<'i, str>>)> {
     let mut number_per = None;
     let mut number_total = None;
     let mut currency = None;

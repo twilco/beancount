@@ -15,5 +15,5 @@ beancount-core = { version = "0.2", path = "../beancount-core" }
 pest = "2"
 pest_derive = "2"
 indoc = "1"
-rust_decimal = "1"
+bigdecimal = "0.4"
 lazy_static = "1"

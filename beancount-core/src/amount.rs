@@ -1,4 +1,4 @@
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal;
 use std::cmp;
 use std::convert::TryFrom;
 use typed_builder::TypedBuilder;
@@ -9,7 +9,7 @@ use super::Currency;
 #[derive(Clone, Debug, Eq, PartialEq, TypedBuilder, Hash)]
 pub struct Amount<'a> {
     /// The value of the amount.
-    pub num: Decimal,
+    pub num: BigDecimal,
 
     /// The commodity of the amount.
     pub currency: Currency<'a>,
@@ -30,7 +30,7 @@ impl cmp::PartialOrd for Amount<'_> {
 pub struct IncompleteAmount<'a> {
     /// The (optional) value of the amount.
     #[builder(default)]
-    pub num: Option<Decimal>,
+    pub num: Option<BigDecimal>,
 
     /// The (optional) commodity of the amount.
     #[builder(default)]

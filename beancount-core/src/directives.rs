@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
-use rust_decimal::Decimal;
+use bigdecimal::BigDecimal;
 use typed_builder::TypedBuilder;
 
 use super::account::Account;
@@ -106,7 +106,7 @@ pub struct Balance<'a> {
     pub amount: Amount<'a>,
 
     #[builder(default)]
-    pub tolerance: Option<Decimal>,
+    pub tolerance: Option<BigDecimal>,
 
     // diff_amount: Option<Amount>,
     /// Metadata attached to the balance directive.

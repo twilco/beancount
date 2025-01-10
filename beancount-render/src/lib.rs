@@ -344,7 +344,7 @@ impl<'a, W: Write> Renderer<&'a CostSpec<'_>, W> for BasicRenderer {
         let mut first = true;
 
         if let (Some(cost), Some(currency)) =
-            (&cost.number_total.or(cost.number_per), &cost.currency)
+            (&cost.number_total.clone().or(cost.number_per.clone()), &cost.currency)
         {
             write!(w, "{} {}", cost, currency)?;
             first = false;

@@ -82,7 +82,7 @@ impl ParseError {
         }
     }
 
-    pub(crate) fn decimal_parse_error(err: rust_decimal::Error, span: Span) -> ParseError {
+    pub(crate) fn decimal_parse_error(err: bigdecimal::ParseBigDecimalError, span: Span) -> ParseError {
         let message = format!("error while parsing number: {}", err);
         let pest_error = pest::error::Error::new_from_span(
             pest::error::ErrorVariant::<Rule>::CustomError { message },
