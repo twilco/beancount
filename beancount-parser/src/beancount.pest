@@ -20,17 +20,19 @@ date_separator = @{ "-" | "/" }
 date = ${ year ~ date_separator ~ month ~ date_separator ~ day }
 
 //// Number primitives
-num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
-    int = @{ ASCII_DIGIT{4,} | separated_int }
-    separated_int = @{ ASCII_DIGIT{1,3} ~ ( "," ~ ASCII_DIGIT{3} )* }
-operation = _{ add | subtract | multiply | divide }
+num_expr = { num_prefix* ~ num_primary ~ (num_infix ~ num_prefix* ~ num_primary)* }
+num_prefix = _{ neg | pos }
+    neg      = @{ "-" }
+    pos      = @{ "+" }
+num_infix = _{ add | subtract | multiply | divide }
     add      = @{ "+" }
     subtract = @{ "-" }
     multiply = @{ "*" }
     divide   = @{ "/" }
-num_expr = { term ~ (operation ~ term)* }
-num_prefix = @{ "+" | "-" }
-term = { num_prefix? ~ ( num | "(" ~ num_expr ~ ")" ) }
+num_primary = _{ num | "(" ~ num_expr ~ ")" }
+num = @{ int ~ ("." ~ ASCII_DIGIT*)? }
+    int = @{ ASCII_DIGIT{4,} | separated_int }
+    separated_int = @{ ASCII_DIGIT{1,3} ~ ( "," ~ ASCII_DIGIT{3} )* }
 amount = { num_expr ~ commodity }
 
 //// String primitives

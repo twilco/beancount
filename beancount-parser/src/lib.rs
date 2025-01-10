@@ -5,10 +5,9 @@ use std::str::FromStr;
 
 use lazy_static::lazy_static;
 use pest::iterators::{Pair, Pairs};
-use pest::prec_climber::{Assoc, Operator, PrecClimber};
+use pest::pratt_parser::{Assoc, Op, PrattParser};
 use pest::Parser;
 use pest_derive::Parser as PestParser;
-use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 
 use beancount_core as bc;
@@ -82,10 +81,10 @@ macro_rules! construct {
 }
 
 lazy_static! {
-    static ref PREC_CLIMBER: PrecClimber<Rule> = PrecClimber::new(vec![
-        Operator::new(Rule::add, Assoc::Left) | Operator::new(Rule::subtract, Assoc::Left),
-        Operator::new(Rule::multiply, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
-    ]);
+    static ref PRATT_PARSER: PrattParser<Rule> = PrattParser::new()
+        .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::subtract, Assoc::Left))
+        .op(Op::infix(Rule::multiply, Assoc::Left) | Op::infix(Rule::divide, Assoc::Left))
+        .op(Op::prefix(Rule::neg) | Op::prefix(Rule::pos));
 }
 
 #[derive(PestParser)]
@@ -557,45 +556,32 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
 
 fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::num_expr);
-    PREC_CLIMBER.climb(pair.into_inner(), term, reduce_num_expr)
-}
-
-fn term(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
-    debug_assert!(pair.as_rule() == Rule::term);
-    let span = pair.as_span();
-    let mut term_parts = pair.into_inner();
-    let prefix = optional_rule(Rule::num_prefix, &mut term_parts).map(|p| p.as_str());
-    let pair = term_parts
-        .next()
-        .ok_or_else(|| ParseError::invalid_state_with_span("num or num_expr", span))?;
-    let mut num_expr = match pair.as_rule() {
-        Rule::num => {
-            let s = pair.as_str().replace(',', "");
-            Decimal::from_str(&s).map_err(|e| ParseError::decimal_parse_error(e, pair.as_span()))?
-        }
-        Rule::num_expr => num_expr(pair)?,
-        _ => unimplemented!(),
-    };
-    if let Some("-") = prefix {
-        num_expr.set_sign_positive(!num_expr.is_sign_positive());
-    }
-    Ok(num_expr)
-}
-
-fn reduce_num_expr<'i>(
-    lhs: ParseResult<Decimal>,
-    op: Pair<'i, Rule>,
-    rhs: ParseResult<Decimal>,
-) -> ParseResult<Decimal> {
-    let lhs = lhs?;
-    let rhs = rhs?;
-    Ok(match op.as_rule() {
-        Rule::add => lhs + rhs,
-        Rule::subtract => lhs - rhs,
-        Rule::multiply => lhs * rhs,
-        Rule::divide => lhs / rhs,
-        _ => unimplemented!(),
-    })
+    //PRATT_PARSER.climb(pair.into_inner(), term, reduce_num_expr)
+    PRATT_PARSER
+        .map_primary(|primary| match primary.as_rule() {
+            Rule::num => {
+                let s = primary.as_str().replace(',', "");
+                Decimal::from_str(&s).map_err(|e| ParseError::decimal_parse_error(e, primary.as_span()))
+            }
+            _ => unreachable!(),
+        })
+        .map_prefix(|op, rhs| match op.as_rule() {
+            Rule::neg => rhs.map(|mut v| { v.set_sign_positive(!v.is_sign_positive()); v }),
+            Rule::pos => rhs,
+            _ => unreachable!(),
+        })
+        .map_infix(|lhs, op, rhs| {
+            let lhs = lhs?;
+            let rhs = rhs?;
+            Ok(match op.as_rule() {
+                Rule::add => lhs + rhs,
+                Rule::subtract => lhs - rhs,
+                Rule::multiply => lhs * rhs,
+                Rule::divide => lhs / rhs,
+                _ => unreachable!(),
+            })
+        })
+        .parse(pair.into_inner())
 }
 
 fn amount<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Amount<'i>> {
@@ -821,7 +807,7 @@ fn compound_amount<'i>(
 mod tests {
     use super::*;
     use crate::bc;
-    use bc::metadata::{Link, Tag};
+    use bc::metadata::Tag;
     use indoc::indoc;
     use pest::Parser;
 
@@ -918,8 +904,7 @@ mod tests {
         parse_ok!(num_expr, "1 * 2");
         parse_ok!(num_expr, "1 / 2");
         parse_ok!(num_expr, "1+-(2*3)/(4+6)");
-
-        parse_ok!(num_expr, "1+-+(1)", "1");
+        parse_ok!(num_expr, "1+-+(1)");
     }
 
     #[test]
