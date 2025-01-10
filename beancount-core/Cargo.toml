@@ -5,7 +5,7 @@ version = "0.2.0"
 authors = ["Tyler Wilcock <tyler.l.wilcock@gmail.com>", "Michael Budde <git@mbudde.dk>"]
 repository = "https://github.com/twilco/beancount/tree/master/beancount-core"
 license = "MIT/Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [badges]
 travis-ci = { repository = "twilco/beancount", branch = "master" }
