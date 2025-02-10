@@ -165,8 +165,11 @@ impl<'a, W: Write> Renderer<&'a Balance<'_>, W> for BasicRenderer {
         write!(w, "{} balance ", balance.date)?;
         self.render(&balance.account, w)?;
         write!(w, "\t")?;
-        self.render(&balance.amount, w)?;
-        writeln!(w)?;
+        write!(w, "{}", balance.amount.num)?;
+        if let Some(tol) = balance.tolerance {
+            write!(w, " ~ {}", tol)?;
+        }
+        writeln!(w, "{}", balance.amount.currency)?;
         render_key_value(self, w, &balance.meta)?;
         Ok(())
     }

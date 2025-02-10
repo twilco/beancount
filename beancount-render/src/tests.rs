@@ -38,6 +38,13 @@ fn test_commodity_directive() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_balance_directive() -> anyhow::Result<()> {
+    test_conversion("2012-01-01 balance Assets:Checking 100 EUR\n")?;
+    test_conversion("2012-01-01 balance Assets:Checking 100 ~ 1 EUR\n")?;
+    Ok(())
+}
+
+#[test]
 fn test_document() -> anyhow::Result<()> {
     test_conversion(
         "2013-11-03 document Liabilities:CreditCard \"/home/joe/stmts/apr-2014.pdf\"\n",

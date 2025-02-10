@@ -220,6 +220,7 @@ fn directive<'i>(directive: Pair<'i, Rule>, state: &ParseState) -> ParseResult<b
         Rule::document => document_directive(directive, state)?,
         Rule::price => price_directive(directive, state)?,
         Rule::transaction => transaction_directive(directive, state)?,
+        Rule::balance => balance_directive(directive, state)?,
         _ => bc::Directive::Unsupported,
     };
     Ok(dir)
@@ -322,6 +323,26 @@ fn close_directive<'i>(
         bc::Close: directive => {
             date = date;
             account = |p| account(p, state);
+            meta = |p| meta_kv(p, state);
+            source := Some(source);
+        }
+    }))
+}
+
+fn balance_directive<'i>(
+    directive: Pair<'i, Rule>,
+    state: &ParseState,
+) -> ParseResult<bc::Directive<'i>> {
+    let source = directive.as_str();
+    Ok(bc::Directive::Balance(construct! {
+        bc::Balance: directive => {
+            date = date;
+            account = |p| account(p, state);
+            let (amt, tol) = from pair {
+                amount_tolerance(pair)?
+            };
+            amount := amt;
+            tolerance := tol;
             meta = |p| meta_kv(p, state);
             source := Some(source);
         }
@@ -554,14 +575,16 @@ fn posting<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Post
     })
 }
 
+fn num(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
+    let s = pair.as_str().replace(',', "");
+    Decimal::from_str(&s).map_err(|e| ParseError::decimal_parse_error(e, pair.as_span()))
+}
+
 fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
     debug_assert!(pair.as_rule() == Rule::num_expr);
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
-            Rule::num => {
-                let s = primary.as_str().replace(',', "");
-                Decimal::from_str(&s).map_err(|e| ParseError::decimal_parse_error(e, primary.as_span()))
-            }
+            Rule::num => num(primary),
             _ => unreachable!(),
         })
         .map_prefix(|op, rhs| match op.as_rule() {
@@ -591,6 +614,33 @@ fn amount<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::Amount<'i>> {
             currency = as_str;
         }
     })
+}
+
+fn amount_tolerance<'i>(pair: Pair<'i, Rule>) -> ParseResult<(bc::Amount<'i>, Option<Decimal>)> {
+    debug_assert!(pair.as_rule() == Rule::amount_tolerance);
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let num_val = inner
+        .next()
+        .map(num_expr)
+        .transpose()?
+        .ok_or_else(|| ParseError::invalid_state_with_span("numeric expression", span.clone()))?;
+    let tolerance = optional_rule(Rule::num, &mut inner)
+        .map(num)
+        .transpose()?;
+    let currency = inner
+        .next()
+        .map(as_str)
+        .transpose()?
+        .ok_or_else(|| ParseError::invalid_state_with_span("currency", span.clone()))?
+        .into();
+    Ok((
+            bc::Amount {
+                num: num_val,
+                currency
+            },
+            tolerance
+    ))
 }
 
 fn incomplete_amount<'i>(pair: Pair<'i, Rule>) -> ParseResult<bc::IncompleteAmount<'i>> {
@@ -917,6 +967,14 @@ mod tests {
     }
 
     #[test]
+    fn amount_tolerance() {
+        parse_ok!(amount_tolerance, "1 EUR");
+        parse_ok!(amount_tolerance, "1 ~ 2 EUR");
+        parse_ok!(amount_tolerance, "1 ~ 0.002 EUR");
+        parse_ok!(amount_tolerance, "1.2 ~ 0.002 EUR");
+    }
+
+    #[test]
     fn commodity() {
         parse_ok!(commodity, "AAA");
         parse_ok!(commodity, "EUR");
@@ -989,6 +1047,7 @@ mod tests {
             balance,
             "2014-08-09   balance  Assets:Cash    562.00  USD\n"
         );
+        parse_ok!(balance, "2014-08-09 balance Assets:Cash 562.00 ~ 0.002 USD\n");
     }
 
     #[test]

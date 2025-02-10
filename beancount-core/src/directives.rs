@@ -91,6 +91,7 @@ pub enum Directive<'a> {
 /// 2014-08-09 balance Assets:Cash     562.00 USD
 /// 2014-08-09 balance Assets:Cash     210.00 CAD
 /// 2014-08-09 balance Assets:Cash      60.00 EUR
+/// 2013-09-20 balance Assets:Investing:Funds     319.020 ~ 0.002 RGAGX
 /// ```
 ///
 /// <https://docs.google.com/document/d/1wAMVrKIA2qtRGmoVDSUBJGmYZSygUaR0uOMW1GV3YE0/edit#heading=h.l0pvgeniwvq8>

@@ -131,6 +131,7 @@ impl From<pest::error::Error<Rule>> for ParseError {
                 Rule::num_expr => "numeric expression",
                 Rule::num_primary => "numeric expression term",
                 Rule::amount => "amount",
+                Rule::amount_tolerance => "amount with tolerance",
                 Rule::double_quote => "double quotation mark",
                 Rule::quoted_str => "quoted string",
                 Rule::inner_quoted_str => "inner part of a quoted string",
