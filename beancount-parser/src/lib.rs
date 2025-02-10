@@ -585,6 +585,7 @@ fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
             Rule::num => num(primary),
+            Rule::num_expr => num_expr(primary),
             _ => unreachable!(),
         })
         .map_prefix(|op, rhs| match op.as_rule() {
