@@ -589,7 +589,10 @@ fn num_expr(pair: Pair<'_, Rule>) -> ParseResult<Decimal> {
             _ => unreachable!(),
         })
         .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::neg => rhs.map(|mut v| { v.set_sign_positive(!v.is_sign_positive()); v }),
+            Rule::neg => rhs.map(|mut v| {
+                v.set_sign_positive(!v.is_sign_positive());
+                v
+            }),
             Rule::pos => rhs,
             _ => unreachable!(),
         })
@@ -621,14 +624,11 @@ fn amount_tolerance<'i>(pair: Pair<'i, Rule>) -> ParseResult<(bc::Amount<'i>, Op
     debug_assert!(pair.as_rule() == Rule::amount_tolerance);
     let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let num_val = inner
-        .next()
-        .map(num_expr)
-        .transpose()?
-        .ok_or_else(|| ParseError::invalid_state_with_span("numeric expression", span.clone()))?;
-    let tolerance = optional_rule(Rule::num, &mut inner)
-        .map(num)
-        .transpose()?;
+    let num_val =
+        inner.next().map(num_expr).transpose()?.ok_or_else(|| {
+            ParseError::invalid_state_with_span("numeric expression", span.clone())
+        })?;
+    let tolerance = optional_rule(Rule::num, &mut inner).map(num).transpose()?;
     let currency = inner
         .next()
         .map(as_str)
@@ -636,11 +636,11 @@ fn amount_tolerance<'i>(pair: Pair<'i, Rule>) -> ParseResult<(bc::Amount<'i>, Op
         .ok_or_else(|| ParseError::invalid_state_with_span("currency", span.clone()))?
         .into();
     Ok((
-            bc::Amount {
-                num: num_val,
-                currency
-            },
-            tolerance
+        bc::Amount {
+            num: num_val,
+            currency,
+        },
+        tolerance,
     ))
 }
 
@@ -1048,7 +1048,10 @@ mod tests {
             balance,
             "2014-08-09   balance  Assets:Cash    562.00  USD\n"
         );
-        parse_ok!(balance, "2014-08-09 balance Assets:Cash 562.00 ~ 0.002 USD\n");
+        parse_ok!(
+            balance,
+            "2014-08-09 balance Assets:Cash 562.00 ~ 0.002 USD\n"
+        );
     }
 
     #[test]
