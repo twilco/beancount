@@ -87,7 +87,12 @@ fn render_key_value<W: Write>(
     w: &mut W,
     kv: &HashMap<Cow<'_, str>, MetaValue<'_>>,
 ) -> Result<(), BasicRendererError> {
-    for (key, value) in kv {
+    let mut keys: Vec<&Cow<'_, str>> = kv.keys().collect();
+    keys.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
+    for key in keys {
+        let value = kv
+            .get(key)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "missing meta value"))?;
         write!(w, "\t{}: ", key)?;
         renderer.render(value, w)?;
         writeln!(w)?;
