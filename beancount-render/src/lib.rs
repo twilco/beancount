@@ -106,7 +106,10 @@ impl<'a, W: Write> Renderer<&'a MetaValue<'_>, W> for BasicRenderer {
             MetaValue::Date(date) => write!(w, "{}", date)?,
             MetaValue::Number(num) => write!(w, "{}", num)?,
             MetaValue::Tag(t) => write!(w, "{}", t)?,
-            MetaValue::Text(t) => write!(w, "{}", t)?,
+            MetaValue::Text(t) => {
+                let escaped = t.replace('"', "\\\"");
+                write!(w, r#""{}""#, escaped)?;
+            }
         }
         Ok(())
     }
@@ -229,7 +232,7 @@ impl<'a, W: Write> Renderer<&'a Event<'_>, W> for BasicRenderer {
 impl<'a, W: Write> Renderer<&'a Include<'_>, W> for BasicRenderer {
     type Error = BasicRendererError;
     fn render(&self, include: &'a Include<'_>, w: &mut W) -> Result<(), Self::Error> {
-        writeln!(w, "include \"{}\'", include.filename)?;
+        writeln!(w, r#"include "{}""#, include.filename)?;
         Ok(())
     }
 }
