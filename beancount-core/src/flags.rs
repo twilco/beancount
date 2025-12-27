@@ -12,17 +12,12 @@ use std::fmt;
 /// assert_eq!(Flag::from(":)"), Flag::Other(":)".into()));
 /// ```
 // TODO: Make sure that the variant Other("*") can't be created, since Other("*") != Okay
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Hash)]
 pub enum Flag<'a> {
+    #[default]
     Okay,
     Warning,
     Other(Cow<'a, str>),
-}
-
-impl Default for Flag<'_> {
-    fn default() -> Self {
-        Flag::Okay
-    }
 }
 
 impl<'a> From<&'a str> for Flag<'a> {

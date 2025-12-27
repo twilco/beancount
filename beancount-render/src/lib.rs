@@ -92,7 +92,7 @@ fn render_key_value<W: Write>(
     for key in keys {
         let value = kv
             .get(key)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "missing meta value"))?;
+            .ok_or_else(|| io::Error::other("missing meta value"))?;
         write!(w, "\t{}: ", key)?;
         renderer.render(value, w)?;
         writeln!(w)?;
