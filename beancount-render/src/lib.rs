@@ -125,8 +125,11 @@ impl<'a, W: Write> Renderer<&'a Open<'_>, W> for BasicRenderer {
     fn render(&self, open: &'a Open<'_>, write: &mut W) -> Result<(), Self::Error> {
         write!(write, "{} open ", open.date)?;
         self.render(&open.account, write)?;
-        for currency in open.currencies.iter() {
-            write!(write, " {}", currency)?;
+        if let Some((first, rest)) = open.currencies.split_first() {
+            write!(write, " {}", first)?;
+            for currency in rest.iter() {
+                write!(write, ", {}", currency)?;
+            }
         }
         match open.booking {
             Some(Booking::Strict) => write!(write, r#" "STRICT""#)?,
