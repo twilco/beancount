@@ -86,7 +86,7 @@ impl ParseError {
         let message = format!("error while parsing number: {}", err);
         let pest_error = pest::error::Error::new_from_span(
             pest::error::ErrorVariant::<Rule>::CustomError { message },
-            span.clone(),
+            span,
         );
         ParseError {
             kind: ParseErrorKind::DecimalError {
@@ -141,6 +141,7 @@ impl From<pest::error::Error<Rule>> for ParseError {
                 Rule::commodity_trailing => "trailing commodity",
                 Rule::commodity => "commodity",
                 Rule::commodity_list => "list of commodities",
+                Rule::commodity_sep => "commodity separator",
                 Rule::account_type => "an account category (first part of account name)",
                 Rule::account_name_piece => "part of an account name",
                 Rule::account => "an account name",

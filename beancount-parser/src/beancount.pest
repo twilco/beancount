@@ -45,7 +45,8 @@ escape_sequence = @{ "\\" ~ ANY }
 valid_non_letter_commodity_char = @{ "'" |  "_" | "-" | "." }
 commodity_trailing = @{ valid_non_letter_commodity_char ~ &commodity_trailing | (ASCII_ALPHA_UPPER | ASCII_DIGIT) }
 commodity = @{ ASCII_ALPHA_UPPER ~ commodity_trailing{1, 23} }
-commodity_list = ${ commodity ~ ("," ~ commodity)* }
+commodity_sep = _{ "," ~ WHITESPACE* | WHITESPACE+ }
+commodity_list = ${ commodity ~ (commodity_sep ~ commodity)* }
 
 //// Account primitives
 account_type = @{ UPPERCASE_LETTER ~ (LETTER | DECIMAL_NUMBER | "-")* }
