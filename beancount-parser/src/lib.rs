@@ -1164,7 +1164,7 @@ mod tests {
             "
         );
         assert_eq!(
-            parse(&source).unwrap(),
+            parse(source).unwrap(),
             bc::Ledger {
                 directives: vec![
                     bc::Directive::Plugin(
@@ -1265,10 +1265,7 @@ mod tests {
     }
 
     fn get_sorted_tags<'a>(state: &'a ParseState) -> Vec<&'a str> {
-        let mut tags = state
-            .get_pushed_tags()
-            .map(|a| *a)
-            .collect::<Vec<&'a str>>();
+        let mut tags = state.get_pushed_tags().copied().collect::<Vec<&'a str>>();
         tags.sort();
         tags
     }
@@ -1300,14 +1297,14 @@ mod tests {
             pushtag #social
             "
         );
-        assert!(parse(&source).is_err());
+        assert!(parse(source).is_err());
 
         let source = indoc!(
             "
             poptag #social
             "
         );
-        assert!(parse(&source).is_err());
+        assert!(parse(source).is_err());
 
         let source = indoc!(
             "
@@ -1315,7 +1312,7 @@ mod tests {
             poptag #social
             "
         );
-        assert!(parse(&source).is_ok());
+        assert!(parse(source).is_ok());
 
         let source = indoc!(
             "
@@ -1330,7 +1327,7 @@ mod tests {
             poptag #social
             "
         );
-        assert!(parse(&source).is_ok());
+        assert!(parse(source).is_ok());
         let source = indoc!(
             "
             pushtag #rust-is-cool
@@ -1338,7 +1335,7 @@ mod tests {
             poptag #social
             "
         );
-        assert!(parse(&source).is_err());
+        assert!(parse(source).is_err());
     }
 
     #[test]
@@ -1406,7 +1403,7 @@ mod tests {
                             )))
                             .build()])
                         .tags(
-                            vec!["social", "alcohol"]
+                            ["social", "alcohol"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
@@ -1490,7 +1487,7 @@ mod tests {
             "
         );
         assert_eq!(
-            parse(&source).unwrap(),
+            parse(source).unwrap(),
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
@@ -1498,13 +1495,13 @@ mod tests {
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine".into())
                         .tags(
-                            vec!["tag"]
+                            ["tag"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
                         )
                         .links(
-                            vec!["link"]
+                            ["link"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
@@ -1549,7 +1546,7 @@ mod tests {
             "
         );
         assert_eq!(
-            parse(&source).unwrap(),
+            parse(source).unwrap(),
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
@@ -1557,13 +1554,13 @@ mod tests {
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine".into())
                         .tags(
-                            vec!["tag"]
+                            ["tag"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
                         )
                         .links(
-                            vec!["link"]
+                            ["link"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
