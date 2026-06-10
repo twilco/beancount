@@ -145,7 +145,7 @@ fn optional_rule<'i>(rule: Rule, pairs: &mut Pairs<'i, Rule>) -> Option<Pair<'i,
 }
 
 pub fn parse<'i>(input: &'i str) -> ParseResult<bc::Ledger<'i>> {
-    let parsed = BeancountParser::parse(Rule::file, &input)?
+    let parsed = BeancountParser::parse(Rule::file, input)?
         .next()
         .ok_or_else(|| ParseError::invalid_state("non-empty parse result"))?;
 
@@ -624,16 +624,17 @@ fn amount_tolerance<'i>(pair: Pair<'i, Rule>) -> ParseResult<(bc::Amount<'i>, Op
     debug_assert!(pair.as_rule() == Rule::amount_tolerance);
     let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let num_val =
-        inner.next().map(num_expr).transpose()?.ok_or_else(|| {
-            ParseError::invalid_state_with_span("numeric expression", span.clone())
-        })?;
+    let num_val = inner
+        .next()
+        .map(num_expr)
+        .transpose()?
+        .ok_or_else(|| ParseError::invalid_state_with_span("numeric expression", span))?;
     let tolerance = optional_rule(Rule::num, &mut inner).map(num).transpose()?;
     let currency = inner
         .next()
         .map(as_str)
         .transpose()?
-        .ok_or_else(|| ParseError::invalid_state_with_span("currency", span.clone()))?
+        .ok_or_else(|| ParseError::invalid_state_with_span("currency", span))?
         .into();
     Ok((
         bc::Amount {
@@ -709,7 +710,7 @@ fn price_annotation<'i>(pair: Pair<'i, Rule>) -> ParseResult<(bool, bc::Incomple
     let inner = pair
         .into_inner()
         .next()
-        .ok_or_else(|| ParseError::invalid_state_with_span("price annotation", span.clone()))?;
+        .ok_or_else(|| ParseError::invalid_state_with_span("price annotation", span))?;
     let is_total = inner.as_rule() == Rule::price_annotation_total;
     let amount = incomplete_amount(
         inner
@@ -731,7 +732,7 @@ fn account<'i>(pair: Pair<'i, Rule>, state: &ParseState) -> ParseResult<bc::Acco
     let account_type = state
         .root_names
         .iter()
-        .filter(|(_, ref v)| *v == first)
+        .filter(|(_, v)| v.as_str() == first)
         .map(|(k, _)| *k)
         .next()
         .ok_or_else(|| {
@@ -793,7 +794,7 @@ fn meta_kv_pair<'i>(
     let mut inner = pair.into_inner();
     let key = inner
         .next()
-        .ok_or_else(|| ParseError::invalid_state_with_span("metadata key", span.clone()))?
+        .ok_or_else(|| ParseError::invalid_state_with_span("metadata key", span))?
         .as_str();
     let value_pair = inner
         .next()
@@ -824,13 +825,13 @@ fn get_quoted_str<'i>(pair: Pair<'i, Rule>) -> ParseResult<Cow<'i, str>> {
         .into())
 }
 
-fn flag(pair: Pair<'_, Rule>) -> ParseResult<bc::Flag> {
+fn flag(pair: Pair<'_, Rule>) -> ParseResult<bc::Flag<'_>> {
     Ok(bc::Flag::from(pair.as_str()))
 }
 
-fn compound_amount<'i>(
-    pair: Pair<'i, Rule>,
-) -> ParseResult<(Option<Decimal>, Option<Decimal>, Option<Cow<'i, str>>)> {
+type CompoundAmount<'i> = (Option<Decimal>, Option<Decimal>, Option<Cow<'i, str>>);
+
+fn compound_amount<'i>(pair: Pair<'i, Rule>) -> ParseResult<CompoundAmount<'i>> {
     let mut number_per = None;
     let mut number_total = None;
     let mut currency = None;
@@ -1119,6 +1120,18 @@ mod tests {
         );
         parse_ok!(
             open,
+            "2014-05-01 open Liabilities:CreditCard:CapitalOne USD EUR\n"
+        );
+        parse_ok!(
+            open,
+            "2014-05-01 open Liabilities:CreditCard:CapitalOne USD,EUR\n"
+        );
+        parse_ok!(
+            open,
+            "2014-05-01 open Liabilities:CreditCard:CapitalOne USD, EUR JPY\n"
+        );
+        parse_ok!(
+            open,
             "2014-05-01 open Liabilities:CreditCard:CapitalOne USD \"STRICT\"\n"
         );
     }
@@ -1151,7 +1164,7 @@ mod tests {
             "
         );
         assert_eq!(
-            parse(&source).unwrap(),
+            parse(source).unwrap(),
             bc::Ledger {
                 directives: vec![
                     bc::Directive::Plugin(
@@ -1252,10 +1265,7 @@ mod tests {
     }
 
     fn get_sorted_tags<'a>(state: &'a ParseState) -> Vec<&'a str> {
-        let mut tags = state
-            .get_pushed_tags()
-            .map(|a| *a)
-            .collect::<Vec<&'a str>>();
+        let mut tags = state.get_pushed_tags().copied().collect::<Vec<&'a str>>();
         tags.sort();
         tags
     }
@@ -1287,14 +1297,14 @@ mod tests {
             pushtag #social
             "
         );
-        assert!(parse(&source).is_err());
+        assert!(parse(source).is_err());
 
         let source = indoc!(
             "
             poptag #social
             "
         );
-        assert!(parse(&source).is_err());
+        assert!(parse(source).is_err());
 
         let source = indoc!(
             "
@@ -1302,7 +1312,7 @@ mod tests {
             poptag #social
             "
         );
-        assert!(parse(&source).is_ok());
+        assert!(parse(source).is_ok());
 
         let source = indoc!(
             "
@@ -1317,7 +1327,7 @@ mod tests {
             poptag #social
             "
         );
-        assert!(parse(&source).is_ok());
+        assert!(parse(source).is_ok());
         let source = indoc!(
             "
             pushtag #rust-is-cool
@@ -1325,7 +1335,7 @@ mod tests {
             poptag #social
             "
         );
-        assert!(parse(&source).is_err());
+        assert!(parse(source).is_err());
     }
 
     #[test]
@@ -1393,7 +1403,7 @@ mod tests {
                             )))
                             .build()])
                         .tags(
-                            vec!["social", "alcohol"]
+                            ["social", "alcohol"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
@@ -1477,7 +1487,7 @@ mod tests {
             "
         );
         assert_eq!(
-            parse(&source).unwrap(),
+            parse(source).unwrap(),
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
@@ -1485,13 +1495,13 @@ mod tests {
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine".into())
                         .tags(
-                            vec!["tag"]
+                            ["tag"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
                         )
                         .links(
-                            vec!["link"]
+                            ["link"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
@@ -1536,7 +1546,7 @@ mod tests {
             "
         );
         assert_eq!(
-            parse(&source).unwrap(),
+            parse(source).unwrap(),
             bc::Ledger {
                 directives: vec![bc::Directive::Transaction(
                     bc::Transaction::builder()
@@ -1544,13 +1554,13 @@ mod tests {
                         .payee(Some("Cafe Mogador".into()))
                         .narration("Lamb tagine with wine".into())
                         .tags(
-                            vec!["tag"]
+                            ["tag"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()
                         )
                         .links(
-                            vec!["link"]
+                            ["link"]
                                 .iter()
                                 .map(|a| Cow::from(*a))
                                 .collect::<HashSet<Tag<'_>>>()

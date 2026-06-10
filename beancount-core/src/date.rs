@@ -60,7 +60,7 @@ impl From<NaiveDate> for Date<'_> {
 #[test]
 fn test_date_from_chrono() {
     assert_eq!(
-        Date::from(chrono::NaiveDate::from_ymd(2020, 05, 05)),
+        Date::from(chrono::NaiveDate::from_ymd_opt(2020, 05, 05).unwrap()),
         Date::from_str_unchecked("2020-05-05")
     );
 }

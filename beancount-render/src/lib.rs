@@ -87,7 +87,12 @@ fn render_key_value<W: Write>(
     w: &mut W,
     kv: &HashMap<Cow<'_, str>, MetaValue<'_>>,
 ) -> Result<(), BasicRendererError> {
-    for (key, value) in kv {
+    let mut keys: Vec<&Cow<'_, str>> = kv.keys().collect();
+    keys.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
+    for key in keys {
+        let value = kv
+            .get(key)
+            .ok_or_else(|| io::Error::other("missing meta value"))?;
         write!(w, "\t{}: ", key)?;
         renderer.render(value, w)?;
         writeln!(w)?;
@@ -106,7 +111,10 @@ impl<'a, W: Write> Renderer<&'a MetaValue<'_>, W> for BasicRenderer {
             MetaValue::Date(date) => write!(w, "{}", date)?,
             MetaValue::Number(num) => write!(w, "{}", num)?,
             MetaValue::Tag(t) => write!(w, "{}", t)?,
-            MetaValue::Text(t) => write!(w, "{}", t)?,
+            MetaValue::Text(t) => {
+                let escaped = t.replace('"', "\\\"");
+                write!(w, r#""{}""#, escaped)?;
+            }
         }
         Ok(())
     }
@@ -117,8 +125,11 @@ impl<'a, W: Write> Renderer<&'a Open<'_>, W> for BasicRenderer {
     fn render(&self, open: &'a Open<'_>, write: &mut W) -> Result<(), Self::Error> {
         write!(write, "{} open ", open.date)?;
         self.render(&open.account, write)?;
-        for currency in open.currencies.iter() {
-            write!(write, " {}", currency)?;
+        if let Some((first, rest)) = open.currencies.split_first() {
+            write!(write, " {}", first)?;
+            for currency in rest.iter() {
+                write!(write, ", {}", currency)?;
+            }
         }
         match open.booking {
             Some(Booking::Strict) => write!(write, r#" "STRICT""#)?,
@@ -229,7 +240,7 @@ impl<'a, W: Write> Renderer<&'a Event<'_>, W> for BasicRenderer {
 impl<'a, W: Write> Renderer<&'a Include<'_>, W> for BasicRenderer {
     type Error = BasicRendererError;
     fn render(&self, include: &'a Include<'_>, w: &mut W) -> Result<(), Self::Error> {
-        writeln!(w, "include \"{}\'", include.filename)?;
+        writeln!(w, r#"include "{}""#, include.filename)?;
         Ok(())
     }
 }

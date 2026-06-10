@@ -59,6 +59,12 @@ fn test_event() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_include() -> anyhow::Result<()> {
+    test_conversion("include \"main.bean\"\n")?;
+    Ok(())
+}
+
+#[test]
 fn test_note() -> anyhow::Result<()> {
     test_conversion("2013-11-03 note Liabilities:CreditCard \"Called about fraudulent card.\"\n")?;
     Ok(())
@@ -101,6 +107,17 @@ fn test_transaction() -> anyhow::Result<()> {
           Assets:Trading             -1 HOOL {500.00 USD} @ 585.00 USD
           Assets:Trading         585.00 USD
           Income:Trading:Gains
+    "#})?;
+    Ok(())
+}
+
+#[test]
+fn test_transaction_meta_text() -> anyhow::Result<()> {
+    test_conversion(indoc! {r#"
+        2020-10-02 * "Coffee" "Morning"
+          note: "Paid back Alice"
+          Expenses:Food             3.50 USD
+          Assets:Cash              -3.50 USD
     "#})?;
     Ok(())
 }
